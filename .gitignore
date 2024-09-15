@@ -12,6 +12,11 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
+# Files
+add.txt
+/uploads/document
+/uploads/imagen
+
 # OS
 .DS_Store
 

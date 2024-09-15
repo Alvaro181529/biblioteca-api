@@ -16,7 +16,7 @@ export class CreateBookDto {
   @IsString({ message: 'Book image must be a string' })
   book_imagen?: string;
   @IsOptional()
-  @IsString({ message: 'Book image must be a string' })
+  @IsString({ message: 'Book document must be a string' })
   book_document?: string;
 
   @IsString({ message: 'Book inventory must be a string' })

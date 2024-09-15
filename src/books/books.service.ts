@@ -76,26 +76,36 @@ export class BooksService {
     }
   }
   filesUpload(createBookDto: CreateBookDto, files: Array<Express.Multer.File>) {
-    const [imagen, file] = files;
-    this.validateFilePresence(imagen, createBookDto.book_imagen, 'image');
-    this.validateFilePresence(imagen, createBookDto.book_document, 'PDF');
+    if (Array.isArray(files)) {
+      const [imagen, file] = files;
+      this.validateFilePresence(imagen, createBookDto.book_imagen, 'image');
+      this.validateFilePresence(imagen, createBookDto.book_document, 'PDF');
 
-    if (imagen) {
-      if (imagen.mimetype === 'application/pdf') {
-        const newName = `${createBookDto.book_inventory}-${imagen.filename}`;
-        createBookDto.book_document = newName;
-        this.rename('document', imagen.filename, newName);
-      } else {
-        const newName = `${createBookDto.book_inventory}-${imagen.filename}`;
-        createBookDto.book_imagen = newName;
-        this.rename('imagen', imagen.filename, newName);
+      if (imagen) {
+        if (imagen.mimetype === 'application/pdf') {
+          const newName = `${createBookDto.book_inventory}-${imagen.filename}`;
+          createBookDto.book_document = newName;
+          this.rename('document', imagen.filename, newName);
+        } else {
+          const newName = `${createBookDto.book_inventory}-${imagen.filename}`;
+          createBookDto.book_imagen = newName;
+          this.rename('imagen', imagen.filename, newName);
+        }
+      }
+      if (file) {
+        if (file.mimetype === 'application/pdf') {
+          const newName = `${createBookDto.book_inventory}-${file.filename}`;
+          createBookDto.book_document = newName;
+          this.rename('document', file.filename, newName);
+        } else {
+          const newName = `${createBookDto.book_inventory}-${file.filename}`;
+          createBookDto.book_imagen = newName;
+          this.rename('imagen', file.filename, newName);
+        }
       }
     }
-    if (file) {
-      const newName = `${createBookDto.book_inventory}-${file.filename}`;
-      createBookDto.book_document = newName;
-      this.rename('document', file.filename, newName);
-    }
+
+    return;
   }
   async assingDto(book: BookEntity, createBookDto: CreateBookDto) {
     const { categories, authors, instruments } =
