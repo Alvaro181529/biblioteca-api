@@ -15,14 +15,15 @@ export class PaginacionService {
     range: { start: number; end: number };
   } {
     const totalPages = Math.ceil(total / pageSize);
-    const start = (page - 1) * pageSize;
+    const adjustedPage = Math.max(1, Math.min(page, totalPages));
+    const start = (adjustedPage - 1) * pageSize;
     const end = Math.min(start + pageSize, total);
     const paginatedData = data.slice(start, end);
 
     return {
       data: paginatedData,
       total,
-      currentPage: page,
+      currentPage: adjustedPage,
       totalPages,
       range: { start: start + 1, end: end },
     };
