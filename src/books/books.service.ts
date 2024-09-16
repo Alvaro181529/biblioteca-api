@@ -187,12 +187,13 @@ export class BooksService {
     const [data, total] = await this.bookRepository.findAndCount({
       select: {
         book_inventory: true,
-        book_imagen: true,
+        book_condition: true,
+        book_location: true,
         book_title_original: true,
         book_title_parallel: true,
         book_language: true,
         book_quantity: true,
-        book_loan: true,
+        book_observation: true,
       },
     });
 
