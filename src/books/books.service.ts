@@ -112,9 +112,9 @@ export class BooksService {
       await this.validateRefernce(createBookDto);
     book.book_title_original = createBookDto.book_title_original.toUpperCase();
     book.book_title_parallel = createBookDto.book_title_parallel?.toUpperCase();
-    book.book_category = categories;
-    book.book_authors = authors;
-    book.book_instruments = instruments;
+    book.book_category = categories || [];
+    book.book_authors = authors || [];
+    book.book_instruments = instruments || [];
     book.book_price_type = createBookDto.book_price_type?.toUpperCase();
     book.book_price_in_bolivianos =
       book.book_price_type === 'BOB' || !book.book_price_type
@@ -134,7 +134,7 @@ export class BooksService {
     const book = new BookEntity();
 
     Object.assign(book, createBookDto);
-    this.assingDto(book, createBookDto);
+    await this.assingDto(book, createBookDto);
     try {
       return await this.bookRepository.save(book);
     } catch (error) {
@@ -165,6 +165,10 @@ export class BooksService {
         'book.book_title_original',
         'book.book_title_parallel',
         'book.book_language',
+        'book_condition',
+        'book_location',
+        'book_quantity',
+        'book_observation',
       ])
       .getManyAndCount();
     const paginatedResult = this.paginacionService.paginate(

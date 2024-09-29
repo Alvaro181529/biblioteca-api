@@ -101,15 +101,15 @@ export class CreateBookDto {
   @IsArray()
   @Type(() => Number)
   @IsNumber({}, { each: true })
-  book_category?: number[];
+  book_category?: number[] = [];
   @IsOptional()
   @IsArray()
   @Type(() => Number)
   @IsNumber({}, { each: true })
-  book_authors?: number[];
+  book_authors?: number[] = [];
   @IsOptional()
   @IsArray()
   @Type(() => Number)
   @IsNumber({}, { each: true })
-  book_instruments?: number[];
+  book_instruments?: number[] = [];
 }
