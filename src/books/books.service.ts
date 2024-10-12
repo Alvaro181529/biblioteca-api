@@ -75,7 +75,11 @@ export class BooksService {
       );
     }
   }
-  filesUpload(createBookDto: CreateBookDto, files: Array<Express.Multer.File>) {
+  filesUpload(
+    book: BookEntity,
+    createBookDto: CreateBookDto,
+    files: Array<Express.Multer.File>,
+  ) {
     if (Array.isArray(files)) {
       const [imagen, file] = files;
       this.validateFilePresence(imagen, createBookDto.book_imagen, 'image');
@@ -83,23 +87,23 @@ export class BooksService {
 
       if (imagen) {
         if (imagen.mimetype === 'application/pdf') {
-          const newName = `${createBookDto.book_inventory}-${imagen.filename}`;
-          createBookDto.book_document = newName;
+          const newName = `${book.book_inventory}-${imagen.filename}`;
+          book.book_document = newName;
           this.rename('document', imagen.filename, newName);
         } else {
-          const newName = `${createBookDto.book_inventory}-${imagen.filename}`;
-          createBookDto.book_imagen = newName;
+          const newName = `${book.book_inventory}-${imagen.filename}`;
+          book.book_imagen = newName;
           this.rename('imagen', imagen.filename, newName);
         }
       }
       if (file) {
         if (file.mimetype === 'application/pdf') {
-          const newName = `${createBookDto.book_inventory}-${file.filename}`;
-          createBookDto.book_document = newName;
+          const newName = `${book.book_inventory}-${file.filename}`;
+          book.book_document = newName;
           this.rename('document', file.filename, newName);
         } else {
-          const newName = `${createBookDto.book_inventory}-${file.filename}`;
-          createBookDto.book_imagen = newName;
+          const newName = `${book.book_inventory}-${file.filename}`;
+          book.book_imagen = newName;
           this.rename('imagen', file.filename, newName);
         }
       }
@@ -107,7 +111,21 @@ export class BooksService {
 
     return;
   }
-  async assingDto(book: BookEntity, createBookDto: CreateBookDto) {
+
+  async countInventory(book: BookEntity, createBookDto: CreateBookDto) {
+    const booksCount = await this.bookRepository.count({
+      where: { book_type: createBookDto.book_type },
+    });
+    const bookType = createBookDto.book_type.toLocaleUpperCase();
+    const formattedCount = (booksCount + 1).toString().padStart(8, '0');
+    let combinedString = `${bookType}_${formattedCount}`;
+    if (combinedString.length > 12) {
+      const maxBookTypeLength = 12 - formattedCount.length - 1;
+      combinedString = `${bookType.slice(0, maxBookTypeLength)}_${formattedCount}`;
+    }
+    book.book_inventory = combinedString;
+  }
+  async assingDto(book: BookEntity, createBookDto: any) {
     const { categories, authors, instruments } =
       await this.validateRefernce(createBookDto);
     book.book_title_original = createBookDto.book_title_original.toUpperCase();
@@ -130,11 +148,11 @@ export class BooksService {
     createBookDto: CreateBookDto,
     files: Array<Express.Multer.File>,
   ): Promise<BookEntity> {
-    this.filesUpload(createBookDto, files);
     const book = new BookEntity();
-
     Object.assign(book, createBookDto);
     await this.assingDto(book, createBookDto);
+    await this.countInventory(book, createBookDto);
+    this.filesUpload(book, createBookDto, files);
     try {
       return await this.bookRepository.save(book);
     } catch (error) {
@@ -190,6 +208,7 @@ export class BooksService {
     // Obtén todos los libros
     const [data, total] = await this.bookRepository.findAndCount({
       select: {
+        id: true,
         book_inventory: true,
         book_condition: true,
         book_location: true,
@@ -240,7 +259,7 @@ export class BooksService {
       await this.validateRefernce(updateBookDto);
 
     Object.assign(book, updateBookDto);
-
+    await this.assingDto(book, updateBookDto);
     book.book_title_original = book.book_title_original.toLocaleUpperCase();
     book.book_title_parallel = book.book_title_parallel.toLocaleUpperCase();
     if (updateBookDto.book_category?.length) book.book_category = categories;

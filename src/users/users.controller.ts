@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -41,12 +42,23 @@ export class UsersController {
   }
 
   // @UseGuards(AuthenticationGuard, AuthorizeGuard([Roles.ADMIN]))
-  @Get('all')
-  async findAll(): Promise<UserEntity[]> {
-    return await this.usersService.findAll();
+  @Get()
+  async findAll(
+    @Query('page') page: string = '1',
+    @Query('pageSize') pageSize: string = '10',
+  ): Promise<any> {
+    const pageNumber = parseInt(page, 10);
+    const pageSizeNumber = parseInt(pageSize, 10);
+    return await this.usersService.findAll(pageNumber, pageSizeNumber);
+  }
+  @Post()
+  async create(
+    @Body() userSignUpDto: UserSignUpDto,
+  ): Promise<{ user: UserEntity }> {
+    return { user: await this.usersService.create(userSignUpDto) };
   }
 
-  @Get('single/:id')
+  @Get(':id')
   async findOne(@Param('id') id: string): Promise<UserEntity> {
     return await this.usersService.findOne(+id);
   }
@@ -57,8 +69,8 @@ export class UsersController {
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.usersService.remove(+id);
+  remove(@Param('id') id: string, @CurrentUser() currentUser: UserEntity) {
+    return this.usersService.remove(+id, currentUser);
   }
 
   @UseGuards(AuthenticationGuard)

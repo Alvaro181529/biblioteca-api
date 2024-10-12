@@ -32,7 +32,7 @@ export class InstrumentsService {
 
   async findAll(page: number = 1, pageSize: number = 10): Promise<any> {
     const [data, total] = await this.instrumentRepository.findAndCount({
-      select: { instrument_name: true, instrument_family: true },
+      select: { id: true, instrument_name: true, instrument_family: true },
     });
     const paginatedResult = this.paginacionService.paginate(
       data,

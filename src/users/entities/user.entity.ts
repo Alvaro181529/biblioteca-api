@@ -46,28 +46,4 @@ export class UserEntity {
   update_At: Timestamp;
   @OneToMany(() => OrderEntity, (order) => order.user)
   orders: OrderEntity[];
-  //   @OneToMany(() => InstrumentEntity, (cat) => cat.addedBy)
-  //   instruments: InstrumentEntity[];
-  //   @OneToMany(() => AuthorEntity, (aut) => aut.addedBy)
-  //   authors: AuthorEntity[];
-  //   @OneToMany(() => CategoryEntity, (cat) => cat.addedBy)
-  //   categories: CategoryEntity[];
-  //   @OneToMany(() => BookEntity, (book) => book.addedBy)
-  //   books: BookEntity[];
-  //   @OneToMany(() => ReviewEntity, (rev) => rev.opinion_user)
-  //   reviews: ReviewEntity[];
-  //   @OneToMany(() => ContentEntity, (rev) => rev.addedBy)
-  //   contents: ContentEntity[];
-  //   @OneToMany(() => PublicationEntity, (pub) => pub.addedBy)
-  //   publications: PublicationEntity[];
-  //   @OneToMany(() => EditorialEntity, (edit) => edit.addedBy)
-  //   editorials: EditorialEntity[];
-  //   @OneToMany(() => OrderEntity, (ord) => ord.updateBy)
-  //   orders: OrderEntity[];
-  //   @OneToMany(() => OrderEntity, (ord) => ord.updateBy)
-  //   ordersUpdateBy: OrderEntity[];
-  // @OneToMany(() => LoanEntity, (rev) => rev.loan_user)
-  // loans: LoanEntity[];
-  // @OneToMany(() => LoanEntity, (rev) => rev.updatedBy)
-  // LoanUpdatedBy: LoanEntity[];
 }

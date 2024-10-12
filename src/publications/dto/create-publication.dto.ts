@@ -19,7 +19,7 @@ export class CreatePublicationDto {
     message:
       'Publication importance must be one of the following values: ALTO, MEDIO, BAJO',
   })
-  publication_importance?: Importance[];
+  publication_importance?: Importance;
 
   @IsOptional()
   @IsBoolean({ message: 'Publication active must be a boolean value.' })

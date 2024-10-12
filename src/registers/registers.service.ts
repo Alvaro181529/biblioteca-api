@@ -30,7 +30,7 @@ export class RegistersService {
       throw new NotFoundException('User not found. Please log in.');
     }
     const register = await this.registerRepository.findOne({
-      where: { id: user.id },
+      where: { id: user.register.id },
     });
     return register;
   }

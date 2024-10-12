@@ -7,5 +7,5 @@ export class CreateAuthorDto {
 
   @IsString({ message: 'Author description must be a string.' })
   @IsOptional()
-  author_description?: string;
+  author_biografia?: string;
 }

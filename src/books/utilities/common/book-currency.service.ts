@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -24,16 +24,15 @@ export class CurrencyService {
           .pipe(
             catchError((error: AxiosError) => {
               console.error('Error fetching conversion rate:', error.message);
-              throw new Error('Error fetching conversion rate');
+              throw new BadRequestException('Error fetching conversion rate');
             }),
           ),
       );
-
       const conversionRate = response.data.result;
       return parseFloat(conversionRate.toFixed(2));
     } catch (error) {
       console.error('Error processing conversion rate:', error.message);
-      throw new Error('Error processing conversion rate');
+      throw new BadRequestException('Error processing conversion rate');
     }
   }
 }

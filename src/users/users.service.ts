@@ -13,6 +13,7 @@ import { sign } from 'jsonwebtoken';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { RegisterEntity } from 'src/registers/entities/register.entity';
 import { Roles } from './utilities/common/user-role.enum';
+import { PaginacionService } from 'src/pagination/pagination.service';
 
 @Injectable()
 export class UsersService {
@@ -21,9 +22,26 @@ export class UsersService {
     private usersRepository: Repository<UserEntity>,
     @InjectRepository(RegisterEntity)
     private registerRepository: Repository<RegisterEntity>,
+    private readonly paginacionService: PaginacionService,
   ) {}
 
   async signup(userSignUpDto: UserSignUpDto): Promise<UserEntity> {
+    const register = new RegisterEntity();
+    const newRegister = await this.registerRepository.save(register);
+    const userExist = await this.findUserByEmail(userSignUpDto.email);
+    if (userExist) throw new BadRequestException('El correo no es disponible');
+    if (userSignUpDto.email.includes('@coplumu'))
+      userSignUpDto.rols = Roles.ESTUDENT;
+    userSignUpDto.name = userSignUpDto.name.toUpperCase();
+    userSignUpDto.password = await hash(userSignUpDto.password, 10);
+    let user = this.usersRepository.create(userSignUpDto);
+    user.register = newRegister;
+    user = await this.usersRepository.save(user);
+    delete user.password;
+    return user;
+  }
+
+  async create(userSignUpDto: UserSignUpDto): Promise<UserEntity> {
     const register = new RegisterEntity();
     const newRegister = await this.registerRepository.save(register);
     const userExist = await this.findUserByEmail(userSignUpDto.email);
@@ -54,8 +72,24 @@ export class UsersService {
     return userExist;
   }
 
-  async findAll(): Promise<UserEntity[]> {
-    return await this.usersRepository.find({ relations: { register: true } });
+  async findAll(page: number = 1, pageSize: number = 10): Promise<any> {
+    const [data, total] = await this.usersRepository.findAndCount({
+      relations: { register: true },
+    });
+    const paginatedResult = this.paginacionService.paginate(
+      data,
+      page,
+      pageSize,
+      total,
+    );
+
+    return {
+      data: paginatedResult.data,
+      total: paginatedResult.total,
+      currentPage: paginatedResult.currentPage,
+      totalPages: paginatedResult.totalPages,
+      range: paginatedResult.range,
+    };
   }
 
   async findOne(id: number): Promise<UserEntity> {
@@ -73,12 +107,17 @@ export class UsersService {
     return this.usersRepository.save(user);
   }
 
-  async remove(id: number) {
+  async remove(id: number, userEntity: UserEntity) {
+    if (!userEntity || !userEntity.id)
+      throw new BadRequestException('User not found. Please log in.');
     const user = await this.usersRepository.findOne({
       where: { id },
       relations: { register: true },
     });
     if (!user) throw new NotFoundException('Usuario no encontrado');
+    if (userEntity.id == user.id)
+      throw new BadRequestException('No se puede elimar el usuario actual');
+
     await this.usersRepository.delete(id);
     await this.registerRepository.remove(user.register);
     return { deletedUser: user, status: 'User delated' };

@@ -24,10 +24,9 @@ export class PublicationEntity {
   @Column({
     type: 'enum',
     enum: Importance,
-    array: true,
-    default: [Importance.MEDIO],
+    default: Importance.MEDIO,
   })
-  publication_importance: Importance[];
+  publication_importance: Importance;
 
   @Column({
     type: 'boolean',

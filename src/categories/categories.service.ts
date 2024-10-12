@@ -69,7 +69,7 @@ export class CategoriesService {
 
   async findAll(page: number = 1, pageSize: number = 10): Promise<any> {
     const [data, total] = await this.categoryRepository.findAndCount({
-      select: { category_name: true, category_description: true },
+      select: { id: true, category_name: true, category_description: true },
     });
     const paginatedResult = this.paginacionService.paginate(
       data,

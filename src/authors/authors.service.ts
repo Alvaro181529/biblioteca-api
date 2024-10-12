@@ -24,7 +24,9 @@ export class AuthorsService {
   async create(createAuthorDto: CreateAuthorDto): Promise<AuthorEntity> {
     const author = this.authorRepository.create(createAuthorDto);
     author.author_name = author.author_name.toLocaleUpperCase();
-    if (!author.author_biografia) author.author_biografia = 'SIN DESCRIPCION';
+    if (!author.author_biografia) {
+      author.author_biografia = 'SIN DESCRIPCION';
+    }
     return await this.authorRepository.save(author);
   }
   async searchAuthors(
@@ -65,7 +67,7 @@ export class AuthorsService {
 
   async findAll(page: number = 1, pageSize: number = 10): Promise<any> {
     const [data, total] = await this.authorRepository.findAndCount({
-      select: { author_name: true, author_biografia: true },
+      select: { id: true, author_name: true, author_biografia: true },
     });
     const paginatedResult = this.paginacionService.paginate(
       data,
