@@ -14,6 +14,7 @@ import { CurrencyService } from './utilities/common/book-currency.service';
 import { CategoryEntity } from 'src/categories/entities/category.entity';
 import { AuthorEntity } from 'src/authors/entities/author.entity';
 import { InstrumentEntity } from 'src/instruments/entities/instrument.entity';
+import { ContentEntity } from 'src/contents/entities/content.entity';
 import { OrderStatus } from 'src/orders/utilities/common/order-status.enum';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -27,6 +28,8 @@ export class BooksService {
     private readonly authorRepository: Repository<AuthorEntity>,
     @InjectRepository(InstrumentEntity)
     private readonly instrumentRepository: Repository<InstrumentEntity>,
+    @InjectRepository(ContentEntity)
+    private readonly contentRepository: Repository<ContentEntity>,
     @InjectRepository(CategoryEntity)
     private readonly categoryRepository: Repository<CategoryEntity>,
     private readonly currencyService: CurrencyService,
@@ -113,9 +116,11 @@ export class BooksService {
   }
 
   async countInventory(book: BookEntity, createBookDto: CreateBookDto) {
-    const booksCount = await this.bookRepository.count({
+    const lastBook = await this.bookRepository.findOne({
       where: { book_type: createBookDto.book_type },
+      order: { id: 'DESC' }, // Ordena por el ID de forma descendente
     });
+    const booksCount = Number(lastBook.id);
     const bookType = createBookDto.book_type.toLocaleUpperCase();
     const formattedCount = (booksCount + 1).toString().padStart(8, '0');
     let combinedString = `${bookType}_${formattedCount}`;
@@ -315,14 +320,20 @@ export class BooksService {
     }
   }
   async remove(id: number): Promise<any> {
-    const book = await this.bookRepository.findOne({ where: { id } });
+    const content = await this.contentRepository.find({
+      where: { book: { id } },
+    });
+    const book = await this.bookRepository.findOne({
+      where: { id },
+    });
+    if (content) await this.contentRepository.remove(content);
     if (!book) throw new NotFoundException(`Book with ID ${id} not found`);
     try {
       const data = await this.bookRepository.remove(book);
       return { book: data, message: 'Book deleted successfully' };
     } catch (error) {
       throw new InternalServerErrorException(
-        'Error deleting the category: ' + error.message,
+        'Error deleting the books: ' + error,
       );
     }
   }
