@@ -32,7 +32,7 @@ export class OrdersController {
   }
 
   //auth ADMIN or ROOT
-  @Get('auth')
+  @Get('admin')
   find(
     @Query('term') searchTerm: string,
     @Query('page') page: string = '1',

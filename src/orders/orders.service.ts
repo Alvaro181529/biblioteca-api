@@ -42,12 +42,14 @@ export class OrdersService {
   }
 
   async findAll(user: UserEntity) {
+    if (!user) throw new NotFoundException('You need to log in');
     const order = this.orderRepository.find({
       where: { user: { id: user.id } },
       relations: {
         books: true,
       },
     });
+
     return await order;
   }
 
@@ -56,27 +58,48 @@ export class OrdersService {
     page: number = 1,
     pageSize: number = 10,
   ): Promise<any> {
-    const [data, total] = await this.orderRepository
-      .createQueryBuilder('order')
-      .leftJoinAndSelect('order.user', 'user')
-      .leftJoinAndSelect('order.books', 'book')
-      .where(
-        'similarity(unaccent(user.name), unaccent(:searchTerm)) > 0.2 OR similarity(unaccent(user.email), unaccent(:searchTerm)) > 0.5',
-        {
-          searchTerm,
-        },
-      )
-      .select([
-        'order.id',
-        'user.name',
-        'user.email',
-        'book.id',
-        'book.book_title_original',
-        'book.book_title_parallel',
-        'book.book_location',
-        'book.book_quantity',
-      ])
-      .getManyAndCount();
+    let data: any;
+    let total: any;
+
+    if (!searchTerm) {
+      [data, total] = await this.orderRepository
+        .createQueryBuilder('order')
+        .leftJoinAndSelect('order.user', 'user')
+        .leftJoinAndSelect('order.books', 'book')
+        .select([
+          'order.id',
+          'user.name',
+          'user.email',
+          'book.id',
+          'book.book_title_original',
+          'book.book_title_parallel',
+          'book.book_location',
+          'book.book_quantity',
+        ])
+        .getManyAndCount();
+    } else {
+      [data, total] = await this.orderRepository
+        .createQueryBuilder('order')
+        .leftJoinAndSelect('order.user', 'user')
+        .leftJoinAndSelect('order.books', 'book')
+        .where(
+          'similarity(unaccent(user.name), unaccent(:searchTerm)) > 0.2 OR similarity(unaccent(user.email), unaccent(:searchTerm)) > 0.5',
+          {
+            searchTerm,
+          },
+        )
+        .select([
+          'order.id',
+          'user.name',
+          'user.email',
+          'book.id',
+          'book.book_title_original',
+          'book.book_title_parallel',
+          'book.book_location',
+          'book.book_quantity',
+        ])
+        .getManyAndCount();
+    }
     const paginatedResult = this.paginacionService.paginate(
       data,
       page,

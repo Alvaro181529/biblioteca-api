@@ -115,13 +115,20 @@ export class BooksService {
     return;
   }
 
+  extractNumberFromInventory(inventory: string): number | null {
+    const match = inventory.match(/\d+/);
+    return match ? parseInt(match[0], 10) : null;
+  }
   async countInventory(book: BookEntity, createBookDto: CreateBookDto) {
     const lastBook = await this.bookRepository.findOne({
       where: { book_type: createBookDto.book_type },
-      order: { id: 'DESC' }, // Ordena por el ID de forma descendente
+      order: { id: 'DESC' },
     });
-    const booksCount = Number(lastBook.id);
     const bookType = createBookDto.book_type.toLocaleUpperCase();
+    const numberAsInteger: number = lastBook
+      ? this.extractNumberFromInventory(lastBook.book_inventory) || 1
+      : 0;
+    const booksCount = Number(numberAsInteger);
     const formattedCount = (booksCount + 1).toString().padStart(8, '0');
     let combinedString = `${bookType}_${formattedCount}`;
     if (combinedString.length > 12) {

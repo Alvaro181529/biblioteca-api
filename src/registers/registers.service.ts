@@ -39,7 +39,7 @@ export class RegistersService {
     user: UserEntity,
   ): Promise<RegisterEntity> {
     if (!user || !user.id) throw new NotFoundException('User not found');
-    const id = user.id;
+    const id = user.register.id;
     const register = await this.findRegisterById(id);
     this.assignUpdatedProperties(register, updateRegisterDto);
     if (updateRegisterDto.register_intrument?.length > 0) {
