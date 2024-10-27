@@ -67,10 +67,24 @@ export class CategoriesService {
     };
   }
 
-  async findAll(page: number = 1, pageSize: number = 10): Promise<any> {
-    const [data, total] = await this.categoryRepository.findAndCount({
-      select: { id: true, category_name: true, category_description: true },
-    });
+  async findAll(
+    page: number = 1,
+    pageSize: number = 10,
+    name: string = '',
+  ): Promise<any> {
+    const search = name.toLocaleLowerCase();
+    const query = this.categoryRepository.createQueryBuilder('category');
+
+    if (search) {
+      query.where(
+        `similarity(unaccent(category.category_name), unaccent(:searchTerm)) > 0.3 `,
+        {
+          searchTerm: `%${search}%`,
+        },
+      );
+    }
+
+    const [data, total] = await query.getManyAndCount();
     const paginatedResult = this.paginacionService.paginate(
       data,
       page,
