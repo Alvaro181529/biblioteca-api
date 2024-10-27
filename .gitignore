@@ -17,6 +17,9 @@ add.txt
 /uploads/document
 /uploads/imagen
 
+# DB
+/db/migrations/*
+
 # OS
 .DS_Store
 
