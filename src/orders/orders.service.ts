@@ -13,12 +13,15 @@ import { OrderStatus } from './utilities/common/order-status.enum';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { BooksService } from 'src/books/books.service';
 import { PaginacionService } from 'src/pagination/pagination.service';
+import { Roles } from 'src/users/utilities/common/user-role.enum';
 
 @Injectable()
 export class OrdersService {
   constructor(
     @InjectRepository(OrderEntity)
     private readonly orderRepository: Repository<OrderEntity>,
+    @InjectRepository(UserEntity)
+    private readonly userRepository: Repository<UserEntity>,
     @InjectRepository(BookEntity)
     private readonly bookRepository: Repository<BookEntity>,
     private readonly bookService: BooksService,
@@ -26,18 +29,35 @@ export class OrdersService {
   ) {}
 
   async create(createOrderDto: CreateOrderDto, user: UserEntity) {
-    const { order_status, order_regresado_at } = createOrderDto;
+    const { order_regresado_at, userId } = createOrderDto;
+
     this.validateUser(user);
     this.validateOrders(createOrderDto.orders);
     const quantities = this.getQuantities(createOrderDto.orders);
-
     const books = await this.getBooks(createOrderDto.orders);
     const order = new OrderEntity();
     order.books = books;
-    order.order_status = order_status ?? OrderStatus.ESPERA;
+    if (
+      order.order_status === OrderStatus.DEVUELTO ||
+      order.order_status === OrderStatus.CANCELADO
+    )
+      throw new NotFoundException('Cannot process the order');
+    if (user.rols === Roles.ROOT || user.rols === Roles.ADMIN) {
+      const userNew = await this.userRepository.findOne({
+        where: { id: userId },
+      });
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+      order.order_status = OrderStatus.PRESTADO;
+      order.user = userNew;
+    } else {
+      order.order_status = OrderStatus.ESPERA;
+      order.user = user;
+    }
+    console.log(order.user);
     order.order_regresado_at = order_regresado_at;
     order.book_quantities = quantities;
-    order.user = user;
     return await this.orderRepository.save(order);
   }
 
@@ -53,53 +73,47 @@ export class OrdersService {
     return await order;
   }
 
+  async findBorrawed() {
+    return '';
+  }
   async find(
+    user: UserEntity,
     searchTerm: string,
+    orderStatus: string,
     page: number = 1,
     pageSize: number = 10,
   ): Promise<any> {
-    let data: any;
-    let total: any;
-
-    if (!searchTerm) {
-      [data, total] = await this.orderRepository
-        .createQueryBuilder('order')
-        .leftJoinAndSelect('order.user', 'user')
-        .leftJoinAndSelect('order.books', 'book')
-        .select([
-          'order.id',
-          'user.name',
-          'user.email',
-          'book.id',
-          'book.book_title_original',
-          'book.book_title_parallel',
-          'book.book_location',
-          'book.book_quantity',
-        ])
-        .getManyAndCount();
-    } else {
-      [data, total] = await this.orderRepository
-        .createQueryBuilder('order')
-        .leftJoinAndSelect('order.user', 'user')
-        .leftJoinAndSelect('order.books', 'book')
-        .where(
-          'similarity(unaccent(user.name), unaccent(:searchTerm)) > 0.2 OR similarity(unaccent(user.email), unaccent(:searchTerm)) > 0.5',
-          {
-            searchTerm,
-          },
-        )
-        .select([
-          'order.id',
-          'user.name',
-          'user.email',
-          'book.id',
-          'book.book_title_original',
-          'book.book_title_parallel',
-          'book.book_location',
-          'book.book_quantity',
-        ])
-        .getManyAndCount();
+    // if (!user) throw new NotFoundException('You need to log in');
+    const query = this.orderRepository.createQueryBuilder('order');
+    query
+      .leftJoinAndSelect('order.user', 'user')
+      .leftJoinAndSelect('order.books', 'book');
+    if (orderStatus) {
+      query.andWhere('order.order_status = :orderStatus', { orderStatus });
     }
+    if (searchTerm) {
+      query.andWhere(
+        'similarity(unaccent(user.name), unaccent(:searchTerm)) > 0.2 OR similarity(unaccent(user.email), unaccent(:searchTerm)) > 0.5',
+        {
+          searchTerm,
+        },
+      );
+    }
+    query.select([
+      'order.id',
+      'order.order_status',
+      'order.order_at',
+      'order.order_regresado_at',
+      'user.name',
+      'user.email',
+      'book.id',
+      'book.book_title_original',
+      'book.book_title_parallel',
+      'book.book_location',
+      'book.book_quantity',
+    ]);
+    const [data, total] = await query.getManyAndCount();
+
     const paginatedResult = this.paginacionService.paginate(
       data,
       page,
@@ -158,12 +172,12 @@ export class OrdersService {
     const { DEVUELTO, CANCELADO, ESPERA, PRESTADO } = OrderStatus;
     const { order_status: currentStatus } = order;
     const { order_status: newStatus } = updateOrderDto;
-    if (currentStatus === ESPERA && newStatus !== PRESTADO) {
-      throw new BadRequestException('It has to be borrowed first');
+    if (currentStatus === PRESTADO && newStatus !== DEVUELTO) {
+      throw new BadRequestException('The order must be returned before');
     }
     if (currentStatus === ESPERA) {
       if (newStatus === CANCELADO) {
-        throw new BadRequestException('It cannot be canceled earlier');
+        order.order_at = new Date();
       }
       if (newStatus === PRESTADO) {
         order.order_at = new Date();
@@ -179,15 +193,22 @@ export class OrdersService {
   }
   private validateUser(user: UserEntity) {
     if (!user || !user.id) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('User not found. Please log in');
     }
 
-    if (
-      !user.register.register_ci ||
-      !user.register.register_contact ||
-      !user.register.register_professor ||
-      !user.register.register_ubication
-    ) {
+    if ([Roles.ADMIN, Roles.ROOT].includes(user.rols)) {
+      return;
+    }
+
+    const { register } = user;
+    const requiredFields = [
+      'register_ci',
+      'register_contact',
+      'register_professor',
+      'register_ubication',
+    ];
+
+    if (!register || requiredFields.some((field) => !register[field])) {
       throw new BadRequestException('User registration is incomplete');
     }
   }

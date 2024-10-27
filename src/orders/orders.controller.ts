@@ -34,13 +34,21 @@ export class OrdersController {
   //auth ADMIN or ROOT
   @Get('admin')
   find(
+    @CurrentUser() currentUser: UserEntity,
     @Query('term') searchTerm: string,
+    @Query('state') state: string,
     @Query('page') page: string = '1',
     @Query('pageSize') pageSize: string = '10',
   ): Promise<any> {
     const pageNumber = parseInt(page, 10);
     const pageSizeNumber = parseInt(pageSize, 10);
-    return this.ordersService.find(searchTerm, pageNumber, pageSizeNumber);
+    return this.ordersService.find(
+      currentUser,
+      searchTerm,
+      state,
+      pageNumber,
+      pageSizeNumber,
+    );
   }
   //auth ADMIN or ROOT
   @Patch(':id')

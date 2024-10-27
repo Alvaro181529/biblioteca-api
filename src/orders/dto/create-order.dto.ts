@@ -22,6 +22,7 @@ export class CreateOrderDto {
   @IsDate()
   order_regresado_at?: Date;
 
+  @IsOptional()
   @IsEnum(OrderStatus)
   order_status: OrderStatus;
 
@@ -30,4 +31,7 @@ export class CreateOrderDto {
   @ValidateNested({ each: true })
   @Type(() => OrderDetailDto)
   orders?: OrderDetailDto[];
+
+  @IsOptional()
+  userId: number;
 }
