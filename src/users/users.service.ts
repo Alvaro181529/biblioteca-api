@@ -72,10 +72,22 @@ export class UsersService {
     return userExist;
   }
 
-  async findAll(page: number = 1, pageSize: number = 10): Promise<any> {
-    const [data, total] = await this.usersRepository.findAndCount({
-      relations: { register: true },
-    });
+  async findAll(
+    page: number = 1,
+    pageSize: number = 10,
+    query: string = '',
+  ): Promise<any> {
+    const search = query.toLowerCase();
+    const [data, total] = await this.usersRepository
+      .createQueryBuilder('user')
+      .where(
+        '(LOWER(user.name) LIKE :searchTerm OR LOWER(user.email) LIKE :searchTerm)',
+        {
+          searchTerm: `%${search}%`,
+        },
+      )
+      .leftJoinAndSelect('user.register', 'register')
+      .getManyAndCount();
     const paginatedResult = this.paginacionService.paginate(
       data,
       page,
@@ -101,7 +113,9 @@ export class UsersService {
   async update(id: number, updateUserDto: UpdateUserDto): Promise<UserEntity> {
     const user = await this.usersRepository.findOne({ where: { id } });
     if (!user) throw new NotFoundException(`User with ID ${id} not found`);
-    // user.rols = user.rols.toLocaleUpperCase();
+    user.rols = user.rols;
+    updateUserDto.password = await hash(updateUserDto.password, 10);
+    user.rols = updateUserDto.rols;
     updateUserDto.name = updateUserDto.name.toLocaleUpperCase();
     Object.assign(user, updateUserDto);
     return this.usersRepository.save(user);
