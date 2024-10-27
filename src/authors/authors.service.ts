@@ -65,10 +65,22 @@ export class AuthorsService {
     };
   }
 
-  async findAll(page: number = 1, pageSize: number = 10): Promise<any> {
-    const [data, total] = await this.authorRepository.findAndCount({
-      select: { id: true, author_name: true, author_biografia: true },
-    });
+  async findAll(
+    page: number = 1,
+    pageSize: number = 10,
+    name: string = '',
+  ): Promise<any> {
+    const search = name.toLocaleLowerCase();
+    const query = this.authorRepository.createQueryBuilder('authors');
+    if (search) {
+      query.where(
+        `similarity(unaccent(authors.author_name), unaccent(:searchTerm)) > 0.3 `,
+        {
+          searchTerm: `%${search}%`,
+        },
+      );
+    }
+    const [data, total] = await query.getManyAndCount();
     const paginatedResult = this.paginacionService.paginate(
       data,
       page,
