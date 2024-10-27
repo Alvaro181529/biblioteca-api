@@ -9,7 +9,7 @@ import {
   Timestamp,
   UpdateDateColumn,
 } from 'typeorm';
-import { Condition } from '../utilities/common/book-dondition.enum';
+import { Condition, MediaType } from '../utilities/common/book-dondition.enum';
 import { CategoryEntity } from 'src/categories/entities/category.entity';
 import { AuthorEntity } from 'src/authors/entities/author.entity';
 import { InstrumentEntity } from 'src/instruments/entities/instrument.entity';
@@ -71,8 +71,16 @@ export class BookEntity {
   @Column({ nullable: true })
   book_language: string;
 
+  @Column({
+    type: 'enum',
+    enum: MediaType,
+    default: MediaType.OTHER,
+    nullable: true,
+  })
+  book_type: MediaType; //libro, partitura, revista
+
   @Column({ nullable: true })
-  book_type: string; //libro, partitura, revista
+  book_editorial: string;
 
   @Column({ type: 'text', nullable: true })
   book_description: string;
@@ -80,7 +88,7 @@ export class BookEntity {
   @Column({
     type: 'enum',
     enum: Condition,
-    default: Condition.BUENO,
+    default: Condition.REGULAR,
   })
   book_condition: Condition;
 

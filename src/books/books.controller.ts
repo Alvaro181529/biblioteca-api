@@ -30,12 +30,19 @@ export class BooksController {
 
   @Get()
   async findAll(
+    @Query('query') query: string = '',
+    @Query('type') type: string = '',
     @Query('page') page: string = '1',
     @Query('pageSize') pageSize: string = '10',
   ): Promise<any> {
     const pageNumber = parseInt(page, 10);
     const pageSizeNumber = parseInt(pageSize, 10);
-    return this.booksService.findAll(pageNumber, pageSizeNumber);
+    return await this.booksService.findAll(
+      pageNumber,
+      pageSizeNumber,
+      query,
+      type,
+    );
   }
 
   @Get(':id')

@@ -119,7 +119,10 @@ export class BooksService {
     const match = inventory.match(/\d+/);
     return match ? parseInt(match[0], 10) : null;
   }
-  async countInventory(book: BookEntity, createBookDto: CreateBookDto) {
+  async countInventory(
+    book: BookEntity,
+    createBookDto: CreateBookDto | UpdateBookDto,
+  ) {
     const lastBook = await this.bookRepository.findOne({
       where: { book_type: createBookDto.book_type },
       order: { id: 'DESC' },
@@ -142,6 +145,7 @@ export class BooksService {
       await this.validateRefernce(createBookDto);
     book.book_title_original = createBookDto.book_title_original.toUpperCase();
     book.book_title_parallel = createBookDto.book_title_parallel?.toUpperCase();
+    book.book_editorial = createBookDto.book_editorial?.toUpperCase();
     book.book_category = categories || [];
     book.book_authors = authors || [];
     book.book_instruments = instruments || [];
@@ -216,21 +220,45 @@ export class BooksService {
       range: paginatedResult.range,
     };
   }
-  async findAll(page: number = 1, pageSize: number = 10): Promise<any> {
+  async findAll(
+    page: number = 1,
+    pageSize: number = 10,
+    searchTerm: string = '',
+    searchType: string = '',
+  ): Promise<any> {
     // Obtén todos los libros
-    const [data, total] = await this.bookRepository.findAndCount({
-      select: {
-        id: true,
-        book_inventory: true,
-        book_condition: true,
-        book_location: true,
-        book_title_original: true,
-        book_title_parallel: true,
-        book_language: true,
-        book_quantity: true,
-        book_observation: true,
-      },
-    });
+    const query = this.bookRepository.createQueryBuilder('book');
+    // Si hay un término de búsqueda, agregar la cláusula WHERE
+    if (searchTerm) {
+      query.andWhere(
+        `similarity(unaccent(book.book_title_original), unaccent(:searchTerm)) > 0.3
+        OR similarity(unaccent(book.book_title_parallel), unaccent(:searchTerm)) > 0.3`,
+        {
+          searchTerm: `%${searchTerm.toLowerCase()}%`,
+        },
+      );
+    }
+    if (searchType) {
+      query.andWhere(`book.book_type = :searchType`, {
+        searchType,
+      });
+    }
+    // Seleccionar los campos deseados
+    query.select([
+      'book.id',
+      'book.book_inventory',
+      'book.book_type',
+      'book.book_condition',
+      'book.book_location',
+      'book.book_title_original',
+      'book.book_title_parallel',
+      'book.book_language',
+      'book.book_quantity',
+      'book.book_observation',
+    ]);
+
+    // Obtener los resultados y el total
+    const [data, total] = await query.getManyAndCount();
 
     // Usa el servicio de paginación para paginar los resultados
     const paginatedResult = this.paginacionService.paginate(
@@ -269,9 +297,9 @@ export class BooksService {
     if (!book) throw new NotFoundException(`Book with ID ${id} not found`);
     const { categories, authors, instruments } =
       await this.validateRefernce(updateBookDto);
-
     Object.assign(book, updateBookDto);
     await this.assingDto(book, updateBookDto);
+    await this.countInventory(book, updateBookDto);
     book.book_title_original = book.book_title_original.toLocaleUpperCase();
     book.book_title_parallel = book.book_title_parallel.toLocaleUpperCase();
     if (updateBookDto.book_category?.length) book.book_category = categories;
@@ -303,6 +331,11 @@ export class BooksService {
   ): Promise<BookEntity> {
     const book = await this.findOne(id);
     this.validateUpdateBook(book, stock, id);
+    if (book.book_quantity <= 0) {
+      throw new NotFoundException(
+        `The book with id ${book.book_title_original} is not available.`,
+      );
+    }
     if (OrderStatus.PRESTADO === status) {
       book.book_quantity -= stock;
       book.book_loan += stock;

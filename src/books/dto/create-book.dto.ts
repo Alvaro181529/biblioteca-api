@@ -9,7 +9,7 @@ import {
   IsNumber,
   IsArray,
 } from 'class-validator';
-import { Condition } from '../utilities/common/book-dondition.enum';
+import { Condition, MediaType } from '../utilities/common/book-dondition.enum';
 import { Type } from 'class-transformer';
 export class CreateBookDto {
   @IsOptional()
@@ -71,8 +71,16 @@ export class CreateBookDto {
   book_language?: string;
 
   @IsOptional()
+  @IsString({ message: 'Book editorial must be a string' })
+  book_editorial?: string;
+
+  @IsOptional()
+  @IsEnum(MediaType, {
+    each: true,
+    message: 'Book type must be a valid condition',
+  })
   @IsString({ message: 'Book type must be a string' })
-  book_type?: string;
+  book_type?: MediaType;
 
   @IsOptional()
   @IsString({ message: 'Book description must be a string' })

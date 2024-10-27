@@ -4,13 +4,15 @@ export enum Condition {
   MALO = 'MALO',
 }
 export enum MediaType {
-  BOOK = 'BOOK',
+  BOOK = 'LIBRO',
   DVD = 'DVD',
   CD = 'CD',
   CASSETTE = 'CASSETTE',
-  MAGAZINE = 'MAGAZINE',
-  EBOOK = 'EBOOK',
-  AUDIOBOOK = 'AUDIOBOOK',
-  THESIS = 'THESIS',
-  PROJECT = 'PROJECT',
+  MAGAZINE = 'REVISTA',
+  EBOOK = 'EBOLOK',
+  AUDIOBOOK = 'AUDIO LIBRO',
+  THESIS = 'TESIS',
+  PROJECT = 'PROYECTOS',
+  SCORE = 'PARTITURA',
+  OTHER = 'OTRO',
 }
