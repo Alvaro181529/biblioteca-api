@@ -30,10 +30,22 @@ export class InstrumentsService {
     return await this.instrumentRepository.save(instrument);
   }
 
-  async findAll(page: number = 1, pageSize: number = 10): Promise<any> {
-    const [data, total] = await this.instrumentRepository.findAndCount({
-      select: { id: true, instrument_name: true, instrument_family: true },
-    });
+  async findAll(
+    page: number = 1,
+    pageSize: number = 10,
+    name: string = '',
+  ): Promise<any> {
+    const search = name.toLocaleLowerCase();
+    const query = this.instrumentRepository.createQueryBuilder('instruments');
+    if (search) {
+      query.where(
+        `similarity(unaccent(instruments.instrument_name), unaccent(:searchTerm)) > 0.3 `,
+        {
+          searchTerm: `%${search}%`,
+        },
+      );
+    }
+    const [data, total] = await query.getManyAndCount();
     const paginatedResult = this.paginacionService.paginate(
       data,
       page,
