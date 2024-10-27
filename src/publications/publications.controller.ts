@@ -26,12 +26,17 @@ export class PublicationsController {
 
   @Get()
   async findAll(
+    @Query('query') query: string = '',
     @Query('page') page: string = '1',
     @Query('pageSize') pageSize: string = '10',
   ): Promise<any> {
     const pageNumber = parseInt(page, 10);
     const pageSizeNumber = parseInt(pageSize, 10);
-    return await this.publicationsService.findAll(pageNumber, pageSizeNumber);
+    return await this.publicationsService.findAll(
+      pageNumber,
+      pageSizeNumber,
+      query,
+    );
   }
 
   @Get(':id')

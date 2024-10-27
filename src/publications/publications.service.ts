@@ -24,10 +24,22 @@ export class PublicationsService {
     return await this.publicationRepository.save(publication);
   }
 
-  async findAll(page: number = 1, pageSize: number = 10): Promise<any> {
-    const [data, total] = await this.publicationRepository.findAndCount({
-      order: { publication_update_at: 'ASC' },
-    });
+  async findAll(
+    page: number = 1,
+    pageSize: number = 10,
+    name: string = '',
+  ): Promise<any> {
+    const search = name.toLowerCase();
+    const query = this.publicationRepository.createQueryBuilder('publications');
+    if (search) {
+      query.where(
+        `similarity(unaccent(publications.publication_title), unaccent(:searchTerm)) > 0.3 `,
+        {
+          searchTerm: `%${search}%`,
+        },
+      );
+    }
+    const [data, total] = await query.getManyAndCount();
     const paginatedResult = this.paginacionService.paginate(
       data,
       page,
