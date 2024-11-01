@@ -61,21 +61,48 @@ export class OrdersService {
     return await this.orderRepository.save(order);
   }
 
-  async findAll(user: UserEntity) {
+  async findAll(
+    page: number = 1,
+    pageSize: number = 10,
+    term: string = '',
+    search: string = '',
+    user: UserEntity,
+  ): Promise<any> {
     if (!user) throw new NotFoundException('You need to log in');
-    const order = this.orderRepository.find({
-      where: { user: { id: user.id } },
-      relations: {
-        books: true,
-      },
-    });
 
-    return await order;
+    const query = this.orderRepository
+      .createQueryBuilder('order')
+      .leftJoinAndSelect('order.books', 'book')
+      .where('order.userId = :userId', { userId: user.id });
+    if (term)
+      query.andWhere('order.order_status = :orderStatus', {
+        orderStatus: term.toUpperCase(),
+      });
+    if (search)
+      query.andWhere(
+        'similarity(unaccent(book.book_title_original), unaccent(:search)) > 0.2 OR similarity(unaccent(book.book_title_parallel), unaccent(:search)) > 0.5',
+        {
+          search,
+        },
+      );
+    const [data, total] = await query.getManyAndCount();
+
+    const paginatedResult = this.paginacionService.paginate(
+      data,
+      page,
+      pageSize,
+      total,
+    );
+
+    return {
+      data: paginatedResult.data,
+      total: paginatedResult.total,
+      currentPage: paginatedResult.currentPage,
+      totalPages: paginatedResult.totalPages,
+      range: paginatedResult.range,
+    };
   }
 
-  async findBorrawed() {
-    return '';
-  }
   async find(
     user: UserEntity,
     searchTerm: string,

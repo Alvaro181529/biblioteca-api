@@ -27,8 +27,22 @@ export class OrdersController {
   }
 
   @Get()
-  async findAll(@CurrentUser() currentUser: UserEntity) {
-    return await this.ordersService.findAll(currentUser);
+  async findAll(
+    @Query('seach') search: string = '',
+    @Query('term') searchTerm: string = '',
+    @Query('page') page: string = '1',
+    @Query('pageSize') pageSize: string = '10',
+    @CurrentUser() currentUser: UserEntity,
+  ) {
+    const pageNumber = parseInt(page, 10);
+    const pageSizeNumber = parseInt(pageSize, 10);
+    return await this.ordersService.findAll(
+      pageNumber,
+      pageSizeNumber,
+      searchTerm,
+      search,
+      currentUser,
+    );
   }
 
   //auth ADMIN or ROOT
