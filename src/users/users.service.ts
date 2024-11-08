@@ -136,7 +136,15 @@ export class UsersService {
     await this.registerRepository.remove(user.register);
     return { deletedUser: user, status: 'User delated' };
   }
-
+  async me(userEntity: UserEntity) {
+    if (!userEntity || !userEntity.id)
+      throw new BadRequestException('User not found. Please log in.');
+    const user = await this.usersRepository.findOne({
+      where: { id: userEntity.id },
+      relations: { register: true },
+    });
+    return user;
+  }
   async findUserByEmail(email: string) {
     return await this.usersRepository.findOneBy({ email });
   }

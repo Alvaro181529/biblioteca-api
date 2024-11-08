@@ -6,7 +6,7 @@ import {
   Patch,
   Param,
   Delete,
-  UseGuards,
+  // UseGuards,
   Query,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
@@ -15,7 +15,7 @@ import { UserSignUpDto } from './dto/user-signup.dto';
 import { UserEntity } from './entities/user.entity';
 import { UserSignInDto } from './dto/user-signin.dto';
 import { CurrentUser } from './utilities/decorators/current-user.decorator';
-import { AuthenticationGuard } from './utilities/guards/authentication.guards';
+// import { AuthenticationGuard } from './utilities/guards/authentication.guards';
 // import { AuthorizeGuard } from './utilities/guards/authorization.guards';
 // import { AuthorizeRoles } from './utilities/decorators/authorize-roles.decorator';
 // import { Roles } from './utilities/common/user-role.enum';
@@ -40,7 +40,11 @@ export class UsersController {
     const accessToken = await this.usersService.accessToken(user);
     return { accessToken, user };
   }
-
+  // @UseGuards(AuthenticationGuard)
+  @Get('me')
+  async getMeProfile(@CurrentUser() currentUser: UserEntity) {
+    return await this.usersService.me(currentUser);
+  }
   // @UseGuards(AuthenticationGuard, AuthorizeGuard([Roles.ADMIN]))
   @Get()
   async findAll(
@@ -70,13 +74,10 @@ export class UsersController {
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string, @CurrentUser() currentUser: UserEntity) {
-    return this.usersService.remove(+id, currentUser);
-  }
-
-  @UseGuards(AuthenticationGuard)
-  @Get('me')
-  getMeProfile(@CurrentUser() currentUser: UserEntity) {
-    return currentUser;
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser() currentUser: UserEntity,
+  ) {
+    return await this.usersService.remove(+id, currentUser);
   }
 }
