@@ -9,7 +9,7 @@ export enum MediaType {
   CD = 'CD',
   CASSETTE = 'CASSETTE',
   MAGAZINE = 'REVISTA',
-  EBOOK = 'EBOLOK',
+  EBOOK = 'EBOOK',
   AUDIOBOOK = 'AUDIO LIBRO',
   THESIS = 'TESIS',
   PROJECT = 'PROYECTOS',
