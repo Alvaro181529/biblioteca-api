@@ -10,6 +10,9 @@ export class CurrencyService {
   constructor(private readonly httpService: HttpService) {}
 
   async convertToBolivianos(amount: number, from: string): Promise<number> {
+    if (!process.env.URL_KEY_CURRENCY || !process.env.API_KEY_CURRENCY) {
+      throw new BadRequestException('Currency API URL or API Key is missing');
+    }
     try {
       const response = await firstValueFrom(
         this.httpService

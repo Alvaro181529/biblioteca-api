@@ -172,9 +172,7 @@ export class BooksService {
     try {
       return await this.bookRepository.save(book);
     } catch (error) {
-      throw new InternalServerErrorException(
-        'Error processing conversion rate' + error,
-      );
+      throw new BadRequestException('Error processing conversion rate' + error);
     }
   }
   async searchBooks(
@@ -246,6 +244,7 @@ export class BooksService {
     // Seleccionar los campos deseados
     query.select([
       'book.id',
+      'book.book_imagen',
       'book.book_inventory',
       'book.book_type',
       'book.book_condition',
