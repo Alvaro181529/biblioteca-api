@@ -14,6 +14,8 @@ import { SearchController } from './search/search.controller';
 import { RegistersModule } from './registers/registers.module';
 import { LikedModule } from './liked/liked.module';
 import { ContentsModule } from './contents/contents.module';
+import { ReportsModule } from './reports/reports.module';
+import { PrinterModule } from './printer/printer.module';
 
 @Module({
   imports: [
@@ -29,6 +31,8 @@ import { ContentsModule } from './contents/contents.module';
     RegistersModule,
     LikedModule,
     ContentsModule,
+    ReportsModule,
+    PrinterModule,
   ],
   controllers: [SearchController],
   providers: [],
