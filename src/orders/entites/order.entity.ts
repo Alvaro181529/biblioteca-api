@@ -23,8 +23,7 @@ export class OrderEntity {
   })
   order_at: Date;
 
-  @CreateDateColumn({
-    type: 'timestamp',
+  @UpdateDateColumn({
     nullable: true,
   })
   order_regresado_at: Date;

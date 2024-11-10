@@ -29,7 +29,7 @@ export class OrdersService {
   ) {}
 
   async create(createOrderDto: CreateOrderDto, user: UserEntity) {
-    const { order_regresado_at, userId } = createOrderDto;
+    const { userId } = createOrderDto;
 
     this.validateUser(user);
     this.validateOrders(createOrderDto.orders);
@@ -51,13 +51,13 @@ export class OrdersService {
       }
       order.order_status = OrderStatus.PRESTADO;
       order.user = userNew;
+      order.book_quantities = quantities;
+      await this.bookUpdate(order, OrderStatus.PRESTADO);
     } else {
       order.order_status = OrderStatus.ESPERA;
       order.user = user;
+      order.book_quantities = quantities;
     }
-    console.log(order.user);
-    order.order_regresado_at = order_regresado_at;
-    order.book_quantities = quantities;
     return await this.orderRepository.save(order);
   }
 
@@ -130,6 +130,7 @@ export class OrdersService {
       'order.id',
       'order.order_status',
       'order.order_at',
+      'order.order_update_at',
       'order.order_regresado_at',
       'user.name',
       'user.email',
