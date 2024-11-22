@@ -34,12 +34,23 @@ export class UsersController {
   @Post('signin')
   async signin(@Body() userSignInDto: UserSignInDto): Promise<{
     accessToken: string;
+    refreshToken: string;
     user: UserEntity;
   }> {
     const user = await this.usersService.signin(userSignInDto);
     const accessToken = await this.usersService.accessToken(user);
-    return { accessToken, user };
+    const refreshToken = await this.usersService.generateRefreshToken(user);
+    return { accessToken, refreshToken, user };
   }
+
+  @Post('refresh-token')
+  async refreshAccessToken(@Body() body: { refreshToken: string }) {
+    const { refreshToken } = body;
+    const accessToken =
+      await this.usersService.refreshAccessToken(refreshToken);
+    return { accessToken };
+  }
+
   // @UseGuards(AuthenticationGuard)
   @Get('me')
   async getMeProfile(@CurrentUser() currentUser: UserEntity) {

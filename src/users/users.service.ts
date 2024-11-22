@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserEntity } from './entities/user.entity';
@@ -9,7 +10,7 @@ import { Repository } from 'typeorm';
 import { UserSignUpDto } from './dto/user-signup.dto';
 import { hash, compare } from 'bcrypt';
 import { UserSignInDto } from './dto/user-signin.dto';
-import { sign } from 'jsonwebtoken';
+import { sign, verify } from 'jsonwebtoken';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { RegisterEntity } from 'src/registers/entities/register.entity';
 import { Roles } from './utilities/common/user-role.enum';
@@ -45,7 +46,6 @@ export class UsersService {
   }
 
   async recomendations(user: UserEntity) {
-    console.log(user);
     const books = this.bookRepository.find({
       take: 5,
     });
@@ -166,5 +166,33 @@ export class UsersService {
       process.env.ACCESS_TOKEN_SECRET_KEY,
       { expiresIn: process.env.ACCESS_TOKEN_EXPIRE_TIME },
     );
+  }
+  async generateRefreshToken(user: UserEntity): Promise<string> {
+    return sign(
+      { id: user.id, email: user.email },
+      process.env.REFRESH_TOKEN_SECRET_KEY,
+      { expiresIn: process.env.REFRESH_TOKEN_EXPIRE_TIME }, // 7 días, por ejemplo
+    );
+  }
+  // Método para verificar y obtener un nuevo accessToken usando refreshToken
+  async refreshAccessToken(refreshToken: string): Promise<string> {
+    try {
+      const decoded = verify(
+        refreshToken,
+        process.env.REFRESH_TOKEN_SECRET_KEY,
+      ) as any;
+
+      const user = await this.usersRepository.findOne({
+        where: { id: decoded.id },
+      });
+
+      if (!user) {
+        throw new UnauthorizedException('Token inválido o expirado');
+      }
+
+      return await this.accessToken(user);
+    } catch (error) {
+      throw new UnauthorizedException('Token inválido o expirado ' + error);
+    }
   }
 }
