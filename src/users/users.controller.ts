@@ -45,6 +45,11 @@ export class UsersController {
   async getMeProfile(@CurrentUser() currentUser: UserEntity) {
     return await this.usersService.me(currentUser);
   }
+  @Get('recomendation')
+  async getMeRecomendation(@CurrentUser() currentUser: UserEntity) {
+    return await this.usersService.recomendations(currentUser);
+  }
+
   // @UseGuards(AuthenticationGuard, AuthorizeGuard([Roles.ADMIN]))
   @Get()
   async findAll(

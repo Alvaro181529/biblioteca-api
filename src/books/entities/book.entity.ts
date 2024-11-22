@@ -98,6 +98,9 @@ export class BookEntity {
   @Column({ type: 'simple-array', nullable: true })
   book_includes: string[];
 
+  @Column({ type: 'simple-array', nullable: true })
+  book_headers: string[];
+
   @Column({ type: 'int', default: 0 })
   book_loan: number;
 

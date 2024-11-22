@@ -106,6 +106,13 @@ export class CreateBookDto {
   book_includes?: string[];
 
   @IsOptional()
+  @IsString({
+    each: true,
+    message: 'Book includes must be an array of strings',
+  })
+  book_headers?: string[];
+
+  @IsOptional()
   @IsArray()
   @Type(() => Number)
   @IsNumber({}, { each: true })

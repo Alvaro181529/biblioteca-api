@@ -5,10 +5,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserEntity } from './entities/user.entity';
 import { RegisterEntity } from 'src/registers/entities/register.entity';
 import { PaginacionModule } from 'src/pagination/pagination.module';
+import { BookEntity } from 'src/books/entities/book.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([UserEntity, RegisterEntity]),
+    TypeOrmModule.forFeature([UserEntity, RegisterEntity, BookEntity]),
     PaginacionModule,
   ],
   controllers: [UsersController],

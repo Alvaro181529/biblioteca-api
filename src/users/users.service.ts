@@ -14,12 +14,15 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { RegisterEntity } from 'src/registers/entities/register.entity';
 import { Roles } from './utilities/common/user-role.enum';
 import { PaginacionService } from 'src/pagination/pagination.service';
+import { BookEntity } from 'src/books/entities/book.entity';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(UserEntity)
     private usersRepository: Repository<UserEntity>,
+    @InjectRepository(BookEntity)
+    private readonly bookRepository: Repository<BookEntity>,
     @InjectRepository(RegisterEntity)
     private registerRepository: Repository<RegisterEntity>,
     private readonly paginacionService: PaginacionService,
@@ -41,6 +44,13 @@ export class UsersService {
     return user;
   }
 
+  async recomendations(user: UserEntity) {
+    console.log(user);
+    const books = this.bookRepository.find({
+      take: 5,
+    });
+    return books;
+  }
   async create(userSignUpDto: UserSignUpDto): Promise<UserEntity> {
     const register = new RegisterEntity();
     const newRegister = await this.registerRepository.save(register);
@@ -114,7 +124,8 @@ export class UsersService {
     const user = await this.usersRepository.findOne({ where: { id } });
     if (!user) throw new NotFoundException(`User with ID ${id} not found`);
     user.rols = user.rols;
-    updateUserDto.password = await hash(updateUserDto.password, 10);
+    if (updateUserDto.password)
+      updateUserDto.password = await hash(updateUserDto.password, 10);
     user.rols = updateUserDto.rols;
     updateUserDto.name = updateUserDto.name.toLocaleUpperCase();
     Object.assign(user, updateUserDto);

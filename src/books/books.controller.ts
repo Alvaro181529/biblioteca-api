@@ -34,6 +34,9 @@ export class BooksController {
     @Query('type') type: string = '',
     @Query('page') page: string = '1',
     @Query('pageSize') pageSize: string = '10',
+    @Query('searchCategories') searchCategories: string[] = [],
+    @Query('searchAuthors') searchAuthors: string[] = [],
+    @Query('searchInstruments') searchInstruments: string[] = [],
   ): Promise<any> {
     const pageNumber = parseInt(page, 10);
     const pageSizeNumber = parseInt(pageSize, 10);
@@ -42,9 +45,16 @@ export class BooksController {
       pageSizeNumber,
       query,
       type,
+      searchCategories,
+      searchAuthors,
+      searchInstruments,
     );
   }
 
+  @Get('news')
+  async NewsBooks() {
+    return await this.booksService.findNews();
+  }
   @Get(':id')
   async findOne(@Param('id') id: string): Promise<BookEntity> {
     return await this.booksService.findOne(+id);

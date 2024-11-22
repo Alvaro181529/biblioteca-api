@@ -10,7 +10,7 @@ export class CurrencyService {
   constructor(private readonly httpService: HttpService) {}
 
   async convertToBolivianos(amount: number, from: string): Promise<number> {
-    const apiUrl = process.env.URL_KEY_CURRENCY_FREE; // URL base de la API
+    const apiUrl = process.env.URL_API_CURRENCY_FREE; // URL base de la API
 
     // Validar que la URL base y la clave API estén definidas
     if (!apiUrl) {
@@ -35,7 +35,6 @@ export class CurrencyService {
           ),
       );
       const conversionRate = response.data.result;
-      console.log('Conversion Rate (parsed):', conversionRate);
       return parseFloat(conversionRate.toFixed(2));
     } catch (error) {
       console.error('Error processing conversion rate:', error.message);

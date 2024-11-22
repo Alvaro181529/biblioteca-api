@@ -8,7 +8,7 @@ import { CreateBookDto } from './dto/create-book.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
 import { BookEntity } from './entities/book.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Between, In, Repository } from 'typeorm';
 import { PaginacionService } from 'src/pagination/pagination.service';
 import { CurrencyService } from './utilities/common/book-currency.service';
 import { CategoryEntity } from 'src/categories/entities/category.entity';
@@ -175,6 +175,17 @@ export class BooksService {
       throw new BadRequestException('Error processing conversion rate' + error);
     }
   }
+  async findNews() {
+    const currentDate = new Date();
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const books = await this.bookRepository.find({
+      where: {
+        book_create_at: Between(weekAgo, currentDate),
+      },
+      take: 6,
+    });
+    return books; // O lo que desees retornar
+  }
   async searchBooks(
     searchTerm: string,
     page: number = 1,
@@ -223,8 +234,10 @@ export class BooksService {
     pageSize: number = 10,
     searchTerm: string = '',
     searchType: string = '',
+    searchCategories: string[] = [],
+    searchAuthors: string[] = [],
+    searchInstruments: string[] = [],
   ): Promise<any> {
-    // Obtén todos los libros
     const query = this.bookRepository.createQueryBuilder('book');
     // Si hay un término de búsqueda, agregar la cláusula WHERE
     if (searchTerm) {
@@ -241,10 +254,41 @@ export class BooksService {
         searchType,
       });
     }
+    if (searchTerm) {
+      query.andWhere('book.book_headers ILIKE ANY(ARRAY[:searchTerm])', {
+        searchTerm: [`%${searchTerm}%`], // Aquí ponemos el % para hacer la búsqueda parcial
+      });
+    }
+
+    // // Si se quiere buscar por categorías
+    if (searchCategories && searchCategories.length > 0) {
+      query
+        .leftJoinAndSelect('book.book_category', 'category')
+        .andWhere('category.name IN (:...searchCategories)', {
+          searchCategories,
+        });
+    }
+
+    // Si se quiere buscar por autores
+    if (searchAuthors && searchAuthors.length > 0) {
+      query
+        .leftJoinAndSelect('book.book_authors', 'author')
+        .andWhere('author.name IN (:...searchAuthors)', { searchAuthors });
+    }
+
+    // Si se quiere buscar por instrumentos
+    if (searchInstruments && searchInstruments.length > 0) {
+      query
+        .leftJoinAndSelect('book.book_instruments', 'instrument')
+        .andWhere('instrument.name IN (:...searchInstruments)', {
+          searchInstruments,
+        });
+    }
     // Seleccionar los campos deseados
     query.select([
       'book.id',
       'book.book_imagen',
+      'book.book_headers',
       'book.book_inventory',
       'book.book_type',
       'book.book_condition',
@@ -255,11 +299,11 @@ export class BooksService {
       'book.book_quantity',
       'book.book_observation',
     ]);
-
-    // Obtener los resultados y el total
+    query.orderBy({
+      'book.book_type': 'ASC',
+      'book.book_create_at': 'ASC',
+    });
     const [data, total] = await query.getManyAndCount();
-
-    // Usa el servicio de paginación para paginar los resultados
     const paginatedResult = this.paginacionService.paginate(
       data,
       page,
