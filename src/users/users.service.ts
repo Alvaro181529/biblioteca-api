@@ -16,12 +16,16 @@ import { RegisterEntity } from 'src/registers/entities/register.entity';
 import { Roles } from './utilities/common/user-role.enum';
 import { PaginacionService } from 'src/pagination/pagination.service';
 import { BookEntity } from 'src/books/entities/book.entity';
+import { UpdatePasswordDto } from './dto/update-password';
+import { OrderEntity } from 'src/orders/entites/order.entity';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(UserEntity)
     private usersRepository: Repository<UserEntity>,
+    @InjectRepository(OrderEntity)
+    private readonly orderRepository: Repository<OrderEntity>,
     @InjectRepository(BookEntity)
     private readonly bookRepository: Repository<BookEntity>,
     @InjectRepository(RegisterEntity)
@@ -46,6 +50,7 @@ export class UsersService {
   }
 
   async recomendations(user: UserEntity) {
+    console.log(user);
     const books = this.bookRepository.find({
       take: 5,
     });
@@ -129,9 +134,31 @@ export class UsersService {
     user.rols = updateUserDto.rols;
     updateUserDto.name = updateUserDto.name.toLocaleUpperCase();
     Object.assign(user, updateUserDto);
-    return this.usersRepository.save(user);
+    return await this.usersRepository.save(user);
   }
+  async updatePassword(userId: number, updatePasswordDto: UpdatePasswordDto) {
+    const { currentPassword, newPassword, confirmedPassword } =
+      updatePasswordDto;
+    const user = await this.usersRepository
+      .createQueryBuilder('users')
+      .addSelect('users.password')
+      .where('users.id=:id', { id: userId })
+      .getOne();
+    if (!user) {
+      throw new BadRequestException('Usuario no encontrado');
+    }
+    const passwordMatch = await compare(currentPassword, user.password);
+    if (!passwordMatch) {
+      throw new BadRequestException('Contraseña actual incorrecta');
+    }
+    if (newPassword !== confirmedPassword) {
+      throw new BadRequestException('Las contraseñas nuevas no coinciden');
+    }
+    user.password = await hash(newPassword, 10);
+    await this.usersRepository.save(user);
 
+    return { message: 'Contraseña actualizada exitosamente' };
+  }
   async remove(id: number, userEntity: UserEntity) {
     if (!userEntity || !userEntity.id)
       throw new BadRequestException('User not found. Please log in.');
@@ -142,6 +169,29 @@ export class UsersService {
     if (!user) throw new NotFoundException('Usuario no encontrado');
     if (userEntity.id == user.id)
       throw new BadRequestException('No se puede elimar el usuario actual');
+
+    await this.usersRepository.delete(id);
+    await this.registerRepository.remove(user.register);
+    return { deletedUser: user, status: 'User delated' };
+  }
+  async deleteAccount(id: number, userEntity: UserEntity) {
+    if (!userEntity || !userEntity.id)
+      throw new BadRequestException('User not found. Please log in.');
+    const user = await this.usersRepository.findOne({
+      where: { id },
+      relations: { register: true },
+    });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+    const [orders, ordersCount] = await this.orderRepository.findAndCount({
+      where: { user: { id: user.id } }, // Asegúrate de que 'user' sea la relación correcta en tu entidad OrderEntity
+    });
+
+    if (ordersCount > 0) {
+      throw new BadRequestException({
+        message: `No se puede eliminar la cuenta. El usuario tiene ${ordersCount} orden(es) asociada(s).`,
+        orders: orders,
+      });
+    }
 
     await this.usersRepository.delete(id);
     await this.registerRepository.remove(user.register);

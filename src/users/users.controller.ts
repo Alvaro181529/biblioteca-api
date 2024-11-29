@@ -8,6 +8,7 @@ import {
   Delete,
   // UseGuards,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -15,15 +16,15 @@ import { UserSignUpDto } from './dto/user-signup.dto';
 import { UserEntity } from './entities/user.entity';
 import { UserSignInDto } from './dto/user-signin.dto';
 import { CurrentUser } from './utilities/decorators/current-user.decorator';
-// import { AuthenticationGuard } from './utilities/guards/authentication.guards';
-// import { AuthorizeGuard } from './utilities/guards/authorization.guards';
+import { UpdatePasswordDto } from './dto/update-password';
+import { AuthenticationGuard } from './utilities/guards/authentication.guards';
+import { AuthorizeGuard } from './utilities/guards/authorization.guards';
 // import { AuthorizeRoles } from './utilities/decorators/authorize-roles.decorator';
-// import { Roles } from './utilities/common/user-role.enum';
+import { Roles } from './utilities/common/user-role.enum';
 
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
-
   @Post('signup')
   async signup(
     @Body() userSignUpDto: UserSignUpDto,
@@ -51,17 +52,25 @@ export class UsersController {
     return { accessToken };
   }
 
-  // @UseGuards(AuthenticationGuard)
+  @UseGuards(AuthenticationGuard)
   @Get('me')
   async getMeProfile(@CurrentUser() currentUser: UserEntity) {
     return await this.usersService.me(currentUser);
   }
+
+  @UseGuards(AuthenticationGuard)
   @Get('recomendation')
   async getMeRecomendation(@CurrentUser() currentUser: UserEntity) {
     return await this.usersService.recomendations(currentUser);
   }
 
-  // @UseGuards(AuthenticationGuard, AuthorizeGuard([Roles.ADMIN]))
+  @UseGuards(AuthenticationGuard, AuthorizeGuard([Roles.ADMIN, Roles.ROOT]))
+  @Get(':id')
+  async findOne(@Param('id') id: string): Promise<UserEntity> {
+    return await this.usersService.findOne(+id);
+  }
+
+  @UseGuards(AuthenticationGuard, AuthorizeGuard([Roles.ADMIN, Roles.ROOT]))
   @Get()
   async findAll(
     @Query('query') query: string = '',
@@ -72,6 +81,8 @@ export class UsersController {
     const pageSizeNumber = parseInt(pageSize, 10);
     return await this.usersService.findAll(pageNumber, pageSizeNumber, query);
   }
+
+  @UseGuards(AuthenticationGuard, AuthorizeGuard([Roles.ADMIN, Roles.ROOT]))
   @Post()
   async create(
     @Body() userSignUpDto: UserSignUpDto,
@@ -79,16 +90,31 @@ export class UsersController {
     return { user: await this.usersService.create(userSignUpDto) };
   }
 
-  @Get(':id')
-  async findOne(@Param('id') id: string): Promise<UserEntity> {
-    return await this.usersService.findOne(+id);
+  @UseGuards(AuthenticationGuard)
+  @Post('update-password')
+  async updatePassword(
+    @Body() updatePasswordDto: UpdatePasswordDto,
+    @CurrentUser() currentUser: UserEntity,
+  ) {
+    const userId = currentUser.id;
+    return await this.usersService.updatePassword(userId, updatePasswordDto); // Llamamos al servicio para actualizar la contraseña
   }
 
+  @UseGuards(AuthenticationGuard)
   @Patch(':id')
   async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return await this.usersService.update(+id, updateUserDto);
   }
 
+  @UseGuards(AuthenticationGuard)
+  @Delete('delete-account')
+  async deleteUser(@CurrentUser() currentUser: UserEntity) {
+    const id = currentUser.id;
+    console.log(id);
+    return await this.usersService.deleteAccount(+id, currentUser);
+  }
+
+  @UseGuards(AuthenticationGuard, AuthorizeGuard([Roles.ADMIN, Roles.ROOT]))
   @Delete(':id')
   async remove(
     @Param('id') id: string,

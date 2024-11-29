@@ -5,11 +5,9 @@ import { Request, Response, NextFunction } from 'express';
 import { UsersService } from 'src/users/users.service';
 import { UserEntity } from 'src/users/entities/user.entity';
 
-declare global {
-  namespace Express {
-    interface Request {
-      currentUser?: UserEntity;
-    }
+declare module 'express' {
+  export interface Request {
+    currentUser?: UserEntity;
   }
 }
 
@@ -36,6 +34,7 @@ export class CurrentUserMiddleware implements NestMiddleware {
         req.currentUser = currentUser;
         next();
       } catch (error) {
+        console.log(error);
         req.currentUser = null;
         next();
       }

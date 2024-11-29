@@ -6,10 +6,16 @@ import { UserEntity } from './entities/user.entity';
 import { RegisterEntity } from 'src/registers/entities/register.entity';
 import { PaginacionModule } from 'src/pagination/pagination.module';
 import { BookEntity } from 'src/books/entities/book.entity';
+import { OrderEntity } from 'src/orders/entites/order.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([UserEntity, RegisterEntity, BookEntity]),
+    TypeOrmModule.forFeature([
+      UserEntity,
+      RegisterEntity,
+      BookEntity,
+      OrderEntity,
+    ]),
     PaginacionModule,
   ],
   controllers: [UsersController],
