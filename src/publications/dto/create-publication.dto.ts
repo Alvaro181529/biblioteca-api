@@ -1,11 +1,18 @@
-import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsNotEmpty,
+} from 'class-validator';
 import { Importance } from '../utilities/common/publication-level.enum';
 
 export class CreatePublicationDto {
-  @IsString({ message: 'Publication image must be a string.' })
-  publication_imagen: string;
-
   @IsOptional()
+  @IsString({ message: 'Publication image must be a string.' })
+  publication_imagen?: string;
+
+  @IsNotEmpty()
   @IsString({ message: 'Publication title must be a string.' })
   publication_title: string;
 
