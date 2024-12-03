@@ -29,16 +29,18 @@ export class ReportsService {
     const columns = [
       { text: 'N', bold: true },
       { text: 'INVENTARIO', bold: true },
+      { text: 'ASIGNATURA TOPOGRAFICA', bold: true },
       { text: 'TITULO ORIGINAL', bold: true },
       { text: 'AUTORES', bold: true },
       { text: 'CONDICIÓN', bold: true },
       { text: 'PRECIO ORIGINAL', bold: true },
     ];
-    const widths = [10, 'auto', '*', '*', 'auto', 'auto'];
+    const widths = ['auto', 'auto', 'auto', '*', '*', 'auto', 'auto'];
 
     const mapFn = (book: BookEntity, index: number) => [
       { text: index + 1, margin: [0, 8] },
       { text: book.book_inventory || 'N/A', margin: [0, 8] },
+      { text: book.book_location || 'N/A', margin: [0, 8] },
       { text: book.book_title_original || 'Sin Título', margin: [0, 8] },
       book.book_authors && book.book_authors.length > 0
         ? {
@@ -49,18 +51,21 @@ export class ReportsService {
       { text: book.book_condition, margin: [0, 8] },
       {
         text:
-          ` (${book.book_price_type.replace(/\s+/g, '')}) ${Intl.NumberFormat(
-            'en-US',
-            {
-              style: 'currency',
-              currency: 'USD',
-            },
-          ).format(book.book_original_price)}` || 'Desconocida',
+          book.book_price_type && book.book_original_price
+            ? `(${book.book_price_type.replace(/\s+/g, '')}) ${Intl.NumberFormat(
+                'en-US',
+                {
+                  style: 'currency',
+                  currency: 'USD',
+                },
+              ).format(book.book_original_price)}`
+            : 'Desconocida',
         bold: true,
         alignment: 'right',
         margin: [0, 5],
       },
     ];
+
     const docDefinition = Reports(
       'Reporte de Inventario',
       data,
