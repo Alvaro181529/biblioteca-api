@@ -49,8 +49,8 @@ export class UsersService {
     return user;
   }
 
-  async recomendations(user: UserEntity) {
-    console.log(user);
+  async recomendations(user?: UserEntity) {
+    if (!user) return;
     const books = this.bookRepository.find({
       take: 5,
     });

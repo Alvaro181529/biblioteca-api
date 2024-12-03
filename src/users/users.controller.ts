@@ -110,7 +110,6 @@ export class UsersController {
   @Delete('delete-account')
   async deleteUser(@CurrentUser() currentUser: UserEntity) {
     const id = currentUser.id;
-    console.log(id);
     return await this.usersService.deleteAccount(+id, currentUser);
   }
 

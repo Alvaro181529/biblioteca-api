@@ -34,7 +34,6 @@ export class CurrentUserMiddleware implements NestMiddleware {
         req.currentUser = currentUser;
         next();
       } catch (error) {
-        console.log(error);
         req.currentUser = null;
         next();
       }
