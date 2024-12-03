@@ -3,12 +3,12 @@ import { diskStorage } from 'multer';
 import { extname } from 'path';
 import * as fs from 'fs';
 
-function ensureDirectoryExists(directory: string) {
+export function ensureDirectoryExists(directory: string) {
   if (!fs.existsSync(directory)) {
     fs.mkdirSync(directory, { recursive: true });
   }
 }
-const imageFileFilter = (req, file, callback) => {
+export const imageFileFilter = (req: any, file: any, callback: any) => {
   const allowedTypes = /jpeg|jpg|png|gif/;
   const mimeType = allowedTypes.test(file.mimetype);
   const extName = allowedTypes.test(extname(file.originalname).toLowerCase());
@@ -19,7 +19,7 @@ const imageFileFilter = (req, file, callback) => {
   callback(new BadRequestException('Invalid image file type'), false);
 };
 
-const documentFileFilter = (req, file, callback) => {
+export const documentFileFilter = (req: any, file: any, callback: any) => {
   const allowedTypes = /pdf/;
   const mimeType = allowedTypes.test(file.mimetype);
   const extName = allowedTypes.test(extname(file.originalname).toLowerCase());
@@ -34,7 +34,7 @@ const documentFileFilter = (req, file, callback) => {
 export const multerOptions = {
   storage: diskStorage({
     destination: (req, file, callback) => {
-      let uploadPath = './uploads/imagen';
+      let uploadPath = './uploads/image';
       if (file.mimetype === 'application/pdf') {
         uploadPath = './uploads/document';
       }
@@ -47,7 +47,7 @@ export const multerOptions = {
       callback(null, fileName);
     },
   }),
-  fileFilter: (req, file: any, callback) => {
+  fileFilter: (req: any, file: any, callback: any) => {
     if (file.mimetype === 'application/pdf') {
       return documentFileFilter(req, file, callback);
     }

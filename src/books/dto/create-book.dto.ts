@@ -103,28 +103,28 @@ export class CreateBookDto {
     each: true,
     message: 'Book includes must be an array of strings',
   })
-  book_includes?: string[];
+  book_includes?: string | string[];
 
   @IsOptional()
   @IsString({
     each: true,
     message: 'Book includes must be an array of strings',
   })
-  book_headers?: string[];
+  book_headers?: string | string[];
 
   @IsOptional()
   @IsArray()
   @Type(() => Number)
   @IsNumber({}, { each: true })
-  book_category?: number[] = [];
+  book_category?: string | number[] = [];
   @IsOptional()
   @IsArray()
   @Type(() => Number)
   @IsNumber({}, { each: true })
-  book_authors?: number[] = [];
+  book_authors?: string | number[] = [];
   @IsOptional()
   @IsArray()
   @Type(() => Number)
   @IsNumber({}, { each: true })
-  book_instruments?: number[] = [];
+  book_instruments?: string | number[] = [];
 }

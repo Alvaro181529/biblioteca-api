@@ -78,41 +78,56 @@ export class BooksService {
       );
     }
   }
+  deleteFileIfExists(file: string, ruta: string): void {
+    const filePath = path.join(`./uploads/${ruta}/${file}`);
+    if (!fs.existsSync(filePath)) return;
+    fs.unlink(filePath, (err) => {
+      if (err) {
+        console.error(`Error al eliminar el archivo: ${filePath}`, err);
+        return;
+      }
+    });
+  }
+  verifyFIle(old: string, newName: string, file: string) {
+    if (old !== newName) this.deleteFileIfExists(old, file);
+  }
   filesUpload(
     book: BookEntity,
-    createBookDto: CreateBookDto,
+    createBookDto: CreateBookDto | UpdateBookDto,
     files: Array<Express.Multer.File>,
   ) {
-    if (Array.isArray(files)) {
-      const [imagen, file] = files;
-      this.validateFilePresence(imagen, createBookDto.book_imagen, 'image');
-      this.validateFilePresence(imagen, createBookDto.book_document, 'PDF');
-
-      if (imagen) {
-        if (imagen.mimetype === 'application/pdf') {
-          const newName = `${book.book_inventory}-${imagen.filename}`;
-          book.book_document = newName;
-          this.rename('document', imagen.filename, newName);
-        } else {
-          const newName = `${book.book_inventory}-${imagen.filename}`;
-          book.book_imagen = newName;
-          this.rename('imagen', imagen.filename, newName);
-        }
-      }
-      if (file) {
-        if (file.mimetype === 'application/pdf') {
-          const newName = `${book.book_inventory}-${file.filename}`;
-          book.book_document = newName;
-          this.rename('document', file.filename, newName);
-        } else {
-          const newName = `${book.book_inventory}-${file.filename}`;
-          book.book_imagen = newName;
-          this.rename('imagen', file.filename, newName);
-        }
+    if (!Array.isArray(files)) return;
+    const [imagen, file] = files;
+    this.validateFilePresence(imagen, createBookDto.book_imagen, 'image');
+    this.validateFilePresence(imagen, createBookDto.book_document, 'PDF');
+    const documentOld = createBookDto.book_document;
+    const imageOld = createBookDto.book_imagen;
+    if (imagen) {
+      if (imagen.mimetype === 'application/pdf') {
+        const newName = `${book.book_inventory}-${imagen.filename}`;
+        this.verifyFIle(documentOld, newName, 'document');
+        book.book_document = newName;
+        this.rename('document', imagen.filename, newName);
+      } else {
+        const newName = `${book.book_inventory}-${imagen.filename}`;
+        this.verifyFIle(imageOld, newName, 'image');
+        book.book_imagen = newName;
+        this.rename('image', imagen.filename, newName);
       }
     }
-
-    return;
+    if (file) {
+      if (file.mimetype === 'application/pdf') {
+        const newName = `${book.book_inventory}-${file.filename}`;
+        this.verifyFIle(documentOld, newName, 'document');
+        book.book_document = newName;
+        this.rename('document', file.filename, newName);
+      } else {
+        const newName = `${book.book_inventory}-${file.filename}`;
+        this.verifyFIle(imageOld, newName, 'image');
+        book.book_imagen = newName;
+        this.rename('image', file.filename, newName);
+      }
+    }
   }
 
   extractNumberFromInventory(inventory: string): number | null {
@@ -140,15 +155,28 @@ export class BooksService {
     }
     book.book_inventory = combinedString;
   }
+  ensureArray = (field: any) => {
+    if (!field || field === '') return [];
+    if (typeof field === 'string') return [field];
+    if (Array.isArray(field)) return field;
+    return [];
+  };
+
   async assingDto(book: BookEntity, createBookDto: any) {
     const { categories, authors, instruments } =
       await this.validateRefernce(createBookDto);
     book.book_title_original = createBookDto.book_title_original.toUpperCase();
     book.book_title_parallel = createBookDto.book_title_parallel?.toUpperCase();
     book.book_editorial = createBookDto.book_editorial?.toUpperCase();
-    book.book_category = categories || [];
-    book.book_authors = authors || [];
-    book.book_instruments = instruments || [];
+    book.book_category = this.ensureArray(
+      categories || createBookDto.book_category,
+    );
+    book.book_authors = this.ensureArray(authors || createBookDto.book_authors);
+    book.book_instruments = this.ensureArray(
+      instruments || createBookDto.book_instruments,
+    );
+    book.book_headers = this.ensureArray(createBookDto.book_headers);
+    book.book_includes = this.ensureArray(createBookDto.book_includes);
     book.book_price_type = createBookDto.book_price_type?.toUpperCase();
     book.book_price_in_bolivianos =
       book.book_price_type === 'BOB' || !book.book_price_type
@@ -196,8 +224,8 @@ export class BooksService {
     const [data, total] = await this.bookRepository
       .createQueryBuilder('book')
       .where(
-        `similarity(unaccent(book.book_title_original), unaccent(:searchTerm)) > 0.3
-        OR similarity(unaccent(book.book_title_parallel), unaccent(:searchTerm)) > 0.3`,
+        `similarity(unaccent_immutable(book.book_title_original), unaccent_immutable(:searchTerm)) > 0.3
+        OR similarity(unaccent_immutable(book.book_title_parallel), unaccent_immutable(:searchTerm)) > 0.3`,
         {
           searchTerm: `%${search}%`,
         },
@@ -242,11 +270,12 @@ export class BooksService {
     // Si hay un término de búsqueda, agregar la cláusula WHERE
     if (searchTerm) {
       query.andWhere(
-        `similarity(unaccent(book.book_title_original), unaccent(:searchTerm)) > 0.3
-        OR similarity(unaccent(book.book_title_parallel), unaccent(:searchTerm)) > 0.3`,
-        {
-          searchTerm: `%${searchTerm.toLowerCase()}%`,
-        },
+        `(
+          similarity(unaccent_immutable(book.book_title_original), unaccent_immutable(:searchTerm)) > 0.3
+          OR similarity(unaccent_immutable(book.book_title_parallel), unaccent_immutable(:searchTerm)) > 0.3
+          OR book.book_headers ILIKE :searchTerm
+        )`,
+        { searchTerm: `%${searchTerm.toLowerCase()}%` },
       );
     }
     if (searchType) {
@@ -254,30 +283,23 @@ export class BooksService {
         searchType,
       });
     }
-    if (searchTerm) {
-      query.andWhere('book.book_headers ILIKE ANY(ARRAY[:searchTerm])', {
-        searchTerm: [`%${searchTerm}%`], // Aquí ponemos el % para hacer la búsqueda parcial
-      });
-    }
-
-    // // Si se quiere buscar por categorías
-    if (searchCategories && searchCategories.length > 0) {
+    // Buscar por categorías
+    if (searchCategories?.length) {
       query
         .leftJoinAndSelect('book.book_category', 'category')
         .andWhere('category.name IN (:...searchCategories)', {
           searchCategories,
         });
     }
-
-    // Si se quiere buscar por autores
-    if (searchAuthors && searchAuthors.length > 0) {
+    // Buscar por autores
+    if (searchAuthors?.length) {
       query
         .leftJoinAndSelect('book.book_authors', 'author')
         .andWhere('author.name IN (:...searchAuthors)', { searchAuthors });
     }
 
-    // Si se quiere buscar por instrumentos
-    if (searchInstruments && searchInstruments.length > 0) {
+    // Buscar por instrumentos
+    if (searchInstruments?.length) {
       query
         .leftJoinAndSelect('book.book_instruments', 'instrument')
         .andWhere('instrument.name IN (:...searchInstruments)', {
@@ -335,7 +357,11 @@ export class BooksService {
     return book;
   }
 
-  async update(id: number, updateBookDto: UpdateBookDto): Promise<BookEntity> {
+  async update(
+    id: number,
+    updateBookDto: UpdateBookDto,
+    files: Array<Express.Multer.File>,
+  ): Promise<BookEntity> {
     const book = await this.bookRepository.findOne({ where: { id } });
     if (!book) throw new NotFoundException(`Book with ID ${id} not found`);
     const { categories, authors, instruments } =
@@ -343,8 +369,9 @@ export class BooksService {
     Object.assign(book, updateBookDto);
     await this.assingDto(book, updateBookDto);
     await this.countInventory(book, updateBookDto);
-    book.book_title_original = book.book_title_original.toLocaleUpperCase();
-    book.book_title_parallel = book.book_title_parallel.toLocaleUpperCase();
+    this.filesUpload(book, updateBookDto, files);
+    // book.book_title_original = book.book_title_original.toLocaleUpperCase();
+    // book.book_title_parallel = book.book_title_parallel.toLocaleUpperCase();
     if (updateBookDto.book_category?.length) book.book_category = categories;
     if (updateBookDto.book_instruments?.length)
       book.book_instruments = instruments;
@@ -374,11 +401,13 @@ export class BooksService {
   ): Promise<BookEntity> {
     const book = await this.findOne(id);
     this.validateUpdateBook(book, stock, id);
-    if (book.book_quantity <= 0) {
-      throw new NotFoundException(
-        `The book with id ${book.book_title_original} is not available.`,
-      );
+    if (stock <= 0) {
+      throw new BadRequestException('Stock must be a positive number.');
     }
+    if (OrderStatus.PRESTADO === status && book.book_quantity < stock) {
+      throw new BadRequestException(`Not enough stock to loan ${stock} books.`);
+    }
+
     if (OrderStatus.PRESTADO === status) {
       book.book_quantity -= stock;
       book.book_loan += stock;
@@ -398,7 +427,7 @@ export class BooksService {
     if (!book) {
       throw new NotFoundException(`Book with ID ${id} not found.`);
     }
-    if (stock < 0) {
+    if (stock <= 0) {
       throw new BadRequestException('Stock must be a non-negative number.');
     }
   }
@@ -412,6 +441,8 @@ export class BooksService {
     if (content) await this.contentRepository.remove(content);
     if (!book) throw new NotFoundException(`Book with ID ${id} not found`);
     try {
+      this.deleteFileIfExists(book.book_document, 'document');
+      this.deleteFileIfExists(book.book_imagen, 'image');
       const data = await this.bookRepository.remove(book);
       return { book: data, message: 'Book deleted successfully' };
     } catch (error) {

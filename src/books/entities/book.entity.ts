@@ -47,7 +47,7 @@ export class BookEntity {
   @Column({ type: 'date', nullable: true })
   book_acquisition_date: Date;
 
-  @Column({ type: 'char', length: 10, nullable: true })
+  @Column({ nullable: true })
   book_price_type: string;
 
   @Column({
