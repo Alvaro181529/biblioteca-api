@@ -12,6 +12,9 @@ export class CreateContentDto {
   @IsString({ message: 'The section title must be a string.' })
   @IsOptional()
   content_sectionTitle: string; // Title of the section in the index
+  @IsString({ message: 'The section title must be a string.' })
+  @IsOptional()
+  content_sectionTitleParallel: string; // Title of the section in the index
 
   @IsNumber({}, { message: 'The page number must be a number.' })
   @IsOptional()

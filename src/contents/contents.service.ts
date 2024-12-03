@@ -74,6 +74,8 @@ export class ContentsService {
       for (const contentDto of contents) {
         const content = new ContentEntity();
         content.content_sectionTitle = contentDto.content_sectionTitle;
+        content.content_sectionTitleParallel =
+          contentDto.content_sectionTitleParallel;
         content.content_pageNumber = contentDto.content_pageNumber;
         content.book = book;
 
@@ -84,7 +86,6 @@ export class ContentsService {
       book.book_contents = [...book.book_contents, ...newContents];
       await this.bookRepository.save(book);
 
-      // Convert newContents to a plain object and remove the circular reference
       const result = plainToInstance(ContentEntity, newContents, {
         excludeExtraneousValues: true,
       });
@@ -123,12 +124,16 @@ export class ContentsService {
     }
     const {
       content_sectionTitle,
+      content_sectionTitleParallel,
       content_pageNumber,
       book: bookId,
     } = updateContentDto;
 
     if (content_sectionTitle !== undefined) {
       content.content_sectionTitle = content_sectionTitle;
+    }
+    if (content_sectionTitleParallel !== undefined) {
+      content.content_sectionTitleParallel = content_sectionTitleParallel;
     }
     if (content_pageNumber !== undefined) {
       content.content_pageNumber = content_pageNumber;
@@ -142,7 +147,6 @@ export class ContentsService {
       }
       content.book = book;
     }
-
     const updatedContent = await this.contentRepository.save(content);
     const result = plainToInstance(ContentEntity, updatedContent, {
       excludeExtraneousValues: true,

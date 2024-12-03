@@ -39,10 +39,6 @@ import { PrinterModule } from './printer/printer.module';
 })
 export class AppModule {
   configure(consumer: MiddlewareConsumer) {
-    // consumer
-    //   .apply(FileMiddleware)
-    //   .forRoutes({ path: 'uploads/*', method: RequestMethod.GET });
-
     consumer
       .apply(CurrentUserMiddleware)
       .forRoutes({ path: '*', method: RequestMethod.ALL });

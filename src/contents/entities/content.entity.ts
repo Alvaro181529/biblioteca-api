@@ -10,11 +10,15 @@ export class ContentEntity {
 
   @Column({ nullable: true })
   @Expose()
-  content_sectionTitle: string; // Título de la sección en el índice
+  content_sectionTitle: string;
 
   @Column({ nullable: true })
   @Expose()
-  content_pageNumber: number; // Página en la que se encuentra la sección
+  content_sectionTitleParallel: string;
+
+  @Column({ nullable: true })
+  @Expose()
+  content_pageNumber: number;
 
   @ManyToOne(() => BookEntity, (book) => book.book_contents)
   @Expose()
