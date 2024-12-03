@@ -15,7 +15,8 @@ lerna-debug.log*
 # Files
 add.txt
 /uploads/document
-/uploads/imagen
+/uploads/image
+/uploads/publication
 
 # DB
 /db/migrations/*
