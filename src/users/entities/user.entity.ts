@@ -30,6 +30,9 @@ export class UserEntity {
   @Column({ type: 'enum', enum: Roles, default: Roles.USER })
   rols: Roles;
 
+  @Column({ nullable: false, default: true })
+  active: boolean;
+
   @OneToOne(() => RegisterEntity, { eager: true })
   @JoinColumn({ name: 'register_id' })
   register: RegisterEntity;
