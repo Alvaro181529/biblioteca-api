@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -18,6 +19,7 @@ import { PaginacionService } from 'src/pagination/pagination.service';
 import { BookEntity } from 'src/books/entities/book.entity';
 import { UpdatePasswordDto } from './dto/update-password';
 import { OrderEntity } from 'src/orders/entites/order.entity';
+import { OrderStatus } from 'src/orders/utilities/common/order-status.enum';
 
 @Injectable()
 export class UsersService {
@@ -76,7 +78,10 @@ export class UsersService {
     const userExist = await this.usersRepository
       .createQueryBuilder('users')
       .addSelect('users.password')
-      .where('users.email=:email', { email: userSignInDto.email })
+      .where('users.email=:email and users.active=:active', {
+        email: userSignInDto.email,
+        active: true,
+      })
       .getOne();
     if (
       !userExist ||
@@ -91,18 +96,26 @@ export class UsersService {
     page: number = 1,
     pageSize: number = 10,
     query: string = '',
+    type: string = 'true',
   ): Promise<any> {
-    const search = query.toLowerCase();
-    const [data, total] = await this.usersRepository
-      .createQueryBuilder('user')
-      .where(
+    const search = query ? query.toLowerCase() : '';
+    const Query = this.usersRepository.createQueryBuilder('user');
+    if (query) {
+      Query.andWhere(
         '(LOWER(user.name) LIKE :searchTerm OR LOWER(user.email) LIKE :searchTerm)',
         {
           searchTerm: `%${search}%`,
         },
-      )
-      .leftJoinAndSelect('user.register', 'register')
-      .getManyAndCount();
+      );
+    }
+    Query.leftJoinAndSelect('user.register', 'register');
+    if (type !== '') {
+      const isActive = type.toLowerCase() === 'true';
+      Query.andWhere('user.active = :isActive', {
+        isActive,
+      });
+    }
+    const [data, total] = await Query.getManyAndCount();
     const paginatedResult = this.paginacionService.paginate(
       data,
       page,
@@ -127,7 +140,7 @@ export class UsersService {
 
   async update(id: number, updateUserDto: UpdateUserDto): Promise<UserEntity> {
     const user = await this.usersRepository.findOne({ where: { id } });
-    if (!user) throw new NotFoundException(`User with ID ${id} not found`);
+    if (!user) throw new NotFoundException(`Usuario id ${id} no encontrado`);
     user.rols = user.rols;
     if (updateUserDto.password)
       updateUserDto.password = await hash(updateUserDto.password, 10);
@@ -160,32 +173,83 @@ export class UsersService {
     return { message: 'Contraseña actualizada exitosamente' };
   }
   async remove(id: number, userEntity: UserEntity) {
-    if (!userEntity || !userEntity.id)
-      throw new BadRequestException('User not found. Please log in.');
     const user = await this.usersRepository.findOne({
       where: { id },
-      relations: { register: true },
+      relations: { register: true, orders: true },
     });
     if (!user) throw new NotFoundException('Usuario no encontrado');
+    const [orders, ordersCount] = await this.orderRepository.findAndCount({
+      where: {
+        user: { id: user.id },
+        order_status: OrderStatus.PRESTADO,
+      },
+    });
+    if (ordersCount > 0) {
+      throw new BadRequestException({
+        message: `No se puede eliminar la cuenta. El usuario tiene ${ordersCount} orden(es) asociada(s).`,
+        orders: orders,
+      });
+    }
     if (userEntity.id == user.id)
       throw new BadRequestException('No se puede elimar el usuario actual');
-
+    await this.orderRepository.remove(user.orders);
     await this.usersRepository.delete(id);
     await this.registerRepository.remove(user.register);
-    return { deletedUser: user, status: 'User delated' };
+    return { user, status: 'User delated' };
+  }
+  async activate(id: number, userEntity: UserEntity) {
+    if (
+      !(
+        userEntity.rols.includes(Roles.ADMIN) ||
+        userEntity.rols.includes(Roles.ROOT)
+      )
+    ) {
+      throw new BadRequestException('Usuario no autorizado');
+    }
+
+    const user = await this.usersRepository.findOne({
+      where: { id: id },
+    });
+    if (!user) throw new BadRequestException('Usuario no encontrado');
+    user.active = true;
+    try {
+      return this.usersRepository.save(user);
+    } catch (error) {
+      throw new InternalServerErrorException('Hubo un error: ', error);
+    }
+  }
+  async desactivate(id: number, userEntity: UserEntity) {
+    if (
+      id !== userEntity.id &&
+      !(
+        userEntity.rols.includes(Roles.ADMIN) ||
+        userEntity.rols.includes(Roles.ROOT)
+      )
+    )
+      throw new BadRequestException('Usuario no autorizado');
+
+    const user = await this.usersRepository.findOne({
+      where: { id: id || userEntity.id },
+    });
+    if (!user) throw new BadRequestException('Usuario no encontrado');
+    user.active = false;
+    try {
+      return this.usersRepository.save(user);
+    } catch (error) {
+      throw new InternalServerErrorException('Hubo un error: ', error);
+    }
   }
   async deleteAccount(id: number, userEntity: UserEntity) {
     if (!userEntity || !userEntity.id)
-      throw new BadRequestException('User not found. Please log in.');
+      throw new BadRequestException('Por favor inicie session');
     const user = await this.usersRepository.findOne({
       where: { id },
       relations: { register: true },
     });
     if (!user) throw new NotFoundException('Usuario no encontrado');
     const [orders, ordersCount] = await this.orderRepository.findAndCount({
-      where: { user: { id: user.id } }, // Asegúrate de que 'user' sea la relación correcta en tu entidad OrderEntity
+      where: { user: { id: user.id } },
     });
-
     if (ordersCount > 0) {
       throw new BadRequestException({
         message: `No se puede eliminar la cuenta. El usuario tiene ${ordersCount} orden(es) asociada(s).`,
@@ -195,11 +259,11 @@ export class UsersService {
 
     await this.usersRepository.delete(id);
     await this.registerRepository.remove(user.register);
-    return { deletedUser: user, status: 'User delated' };
+    return { user, status: 'Userio eliminado' };
   }
   async me(userEntity: UserEntity) {
     if (!userEntity || !userEntity.id)
-      throw new BadRequestException('User not found. Please log in.');
+      throw new BadRequestException('Por favor iniciar session');
     const user = await this.usersRepository.findOne({
       where: { id: userEntity.id },
       relations: { register: true },

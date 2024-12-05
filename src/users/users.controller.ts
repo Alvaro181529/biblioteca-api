@@ -76,10 +76,16 @@ export class UsersController {
     @Query('query') query: string = '',
     @Query('page') page: string = '1',
     @Query('pageSize') pageSize: string = '10',
+    @Query('type') type: string = 'true',
   ): Promise<any> {
     const pageNumber = parseInt(page, 10);
     const pageSizeNumber = parseInt(pageSize, 10);
-    return await this.usersService.findAll(pageNumber, pageSizeNumber, query);
+    return await this.usersService.findAll(
+      pageNumber,
+      pageSizeNumber,
+      query,
+      type,
+    );
   }
 
   @UseGuards(AuthenticationGuard, AuthorizeGuard([Roles.ADMIN, Roles.ROOT]))
@@ -100,6 +106,22 @@ export class UsersController {
     return await this.usersService.updatePassword(userId, updatePasswordDto); // Llamamos al servicio para actualizar la contraseña
   }
 
+  @UseGuards(AuthenticationGuard, AuthorizeGuard([Roles.ADMIN, Roles.ROOT]))
+  @Patch('activate/:id')
+  async activate(
+    @Param('id') id: string,
+    @CurrentUser() currentUser: UserEntity,
+  ) {
+    return await this.usersService.activate(+id, currentUser);
+  }
+  @UseGuards(AuthenticationGuard)
+  @Patch('desactivate/:id')
+  async desactivate(
+    @Param('id') id: string,
+    @CurrentUser() currentUser: UserEntity,
+  ) {
+    return await this.usersService.desactivate(+id, currentUser);
+  }
   @UseGuards(AuthenticationGuard)
   @Patch(':id')
   async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
