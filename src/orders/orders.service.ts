@@ -29,8 +29,24 @@ export class OrdersService {
   ) {}
 
   async create(createOrderDto: CreateOrderDto, user: UserEntity) {
-    const { userId } = createOrderDto;
+    const { userId, orders } = createOrderDto;
 
+    const userOrders = await this.orderRepository.find({
+      where: { user: { id: userId } },
+    });
+
+    const orderedBookIds = userOrders
+      .filter(
+        (order) =>
+          order.order_status === 'ESPERA' || order.order_status === 'PRESTADO',
+      )
+      .flatMap((order) => Object.keys(order.book_quantities));
+
+    for (const order of orders) {
+      if (orderedBookIds.includes(order.id.toString())) {
+        throw new BadRequestException('Ya fue soliciatdo');
+      }
+    }
     this.validateUser(user);
     this.validateOrders(createOrderDto.orders);
     const quantities = this.getQuantities(createOrderDto.orders);

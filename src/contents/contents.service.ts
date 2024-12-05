@@ -159,6 +159,6 @@ export class ContentsService {
     if (!resultFind)
       throw new NotFoundException(`Content with ID ${id} not found`);
     await this.contentRepository.delete(id);
-    return { constent: resultFind, message: 'Content deleted successfully' };
+    return { content: resultFind, message: 'Content deleted successfully' };
   }
 }

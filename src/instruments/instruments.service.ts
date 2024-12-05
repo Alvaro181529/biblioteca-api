@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -95,21 +96,19 @@ export class InstrumentsService {
       throw new NotFoundException(`Instrument with ID ${id} not found.`);
     const bookCount = await this.bookRepository.count({
       where: {
-        book_category: {
-          id,
-        },
+        book_instruments: { id },
       },
     });
     if (bookCount > 0)
-      throw new InternalServerErrorException(
-        'Cannot delete category because it is associated with one or more books',
+      throw new BadRequestException(
+        'Cannot delete instrument because it is associated with one or more books',
       );
     try {
       const info = await this.instrumentRepository.remove(instrument);
-      return { category: info, message: 'Instrument deleted successfully' };
+      return { instrument: info, message: 'Instrument deleted successfully' };
     } catch (error) {
       throw new InternalServerErrorException(
-        'Error deleting the category: ' + error.message,
+        'Error deleting the instrument: ' + error.message,
       );
     }
   }

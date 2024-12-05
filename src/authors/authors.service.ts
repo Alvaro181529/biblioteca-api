@@ -147,7 +147,7 @@ export class AuthorsService {
     });
     if (bookCount > 0)
       throw new InternalServerErrorException(
-        'Cannot delete category because it is associated with one or more books',
+        'Cannot delete author because it is associated with one or more books',
       );
 
     try {

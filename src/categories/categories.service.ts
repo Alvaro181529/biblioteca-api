@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -142,7 +143,7 @@ export class CategoriesService {
       },
     });
     if (bookCount > 0)
-      throw new InternalServerErrorException(
+      throw new BadRequestException(
         'Cannot delete category because it is associated with one or more books',
       );
 

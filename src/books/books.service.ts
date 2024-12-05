@@ -165,6 +165,8 @@ export class BooksService {
   async assingDto(book: BookEntity, createBookDto: any) {
     const { categories, authors, instruments } =
       await this.validateRefernce(createBookDto);
+    book.book_imagen = '';
+    book.book_document = '';
     book.book_title_original = createBookDto.book_title_original.toUpperCase();
     book.book_title_parallel = createBookDto.book_title_parallel?.toUpperCase();
     book.book_editorial = createBookDto.book_editorial?.toUpperCase();
@@ -200,7 +202,7 @@ export class BooksService {
     try {
       return await this.bookRepository.save(book);
     } catch (error) {
-      throw new BadRequestException('Error processing conversion rate' + error);
+      throw new BadRequestException('Error en el guardado' + error);
     }
   }
   async findNews() {
@@ -366,12 +368,11 @@ export class BooksService {
     if (!book) throw new NotFoundException(`Book with ID ${id} not found`);
     const { categories, authors, instruments } =
       await this.validateRefernce(updateBookDto);
+    const inventary = book.book_inventory;
     Object.assign(book, updateBookDto);
     await this.assingDto(book, updateBookDto);
-    await this.countInventory(book, updateBookDto);
     this.filesUpload(book, updateBookDto, files);
-    // book.book_title_original = book.book_title_original.toLocaleUpperCase();
-    // book.book_title_parallel = book.book_title_parallel.toLocaleUpperCase();
+    book.book_inventory = inventary;
     if (updateBookDto.book_category?.length) book.book_category = categories;
     if (updateBookDto.book_instruments?.length)
       book.book_instruments = instruments;
@@ -381,7 +382,7 @@ export class BooksService {
       return await this.bookRepository.save(book);
     } catch (error) {
       throw new InternalServerErrorException(
-        'Error updating the category: ' + error.message,
+        'Error updating the book: ' + error.message,
       );
     }
   }
