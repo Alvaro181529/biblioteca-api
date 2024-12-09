@@ -37,6 +37,10 @@ export class UsersService {
 
   async signup(userSignUpDto: UserSignUpDto): Promise<UserEntity> {
     const register = new RegisterEntity();
+    const count = await this.usersRepository.count();
+    if (!count) {
+      userSignUpDto.rols = Roles.ROOT;
+    }
     const newRegister = await this.registerRepository.save(register);
     const userExist = await this.findUserByEmail(userSignUpDto.email);
     if (userExist) throw new BadRequestException('El correo no es disponible');
@@ -227,7 +231,12 @@ export class UsersService {
       )
     )
       throw new BadRequestException('Usuario no autorizado');
-
+    if (
+      (userEntity.rols == 'ADMIN' || userEntity.rols == 'ROOT') &&
+      id == userEntity.id
+    ) {
+      throw new BadRequestException('Usted no puede eliminarse');
+    }
     const user = await this.usersRepository.findOne({
       where: { id: id || userEntity.id },
     });
