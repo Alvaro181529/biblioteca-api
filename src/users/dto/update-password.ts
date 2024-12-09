@@ -14,7 +14,8 @@ export class UpdatePasswordDto {
   })
   @MaxLength(20)
   @Matches(/(?=.*[0-9])(?=.*[A-Z])(?=.*[a-z])/, {
-    message: 'Password too weak',
+    message:
+      'La contraseña debe contener al menos una letra mayúscula, una letra minúscula y un número',
   })
   currentPassword: string;
   @IsNotEmpty({ message: 'LA contraseña no puede estar vacio' })
@@ -24,7 +25,8 @@ export class UpdatePasswordDto {
   })
   @MaxLength(20)
   @Matches(/(?=.*[0-9])(?=.*[A-Z])(?=.*[a-z])/, {
-    message: 'Password too weak',
+    message:
+      'La contraseña debe contener al menos una letra mayúscula, una letra minúscula y un número',
   })
   newPassword: string;
   @IsNotEmpty({ message: 'LA contraseña no puede estar vacio' })
@@ -34,7 +36,8 @@ export class UpdatePasswordDto {
   })
   @MaxLength(20)
   @Matches(/(?=.*[0-9])(?=.*[A-Z])(?=.*[a-z])/, {
-    message: 'Password too weak',
+    message:
+      'La contraseña debe contener al menos una letra mayúscula, una letra minúscula y un número',
   })
   confirmedPassword: string;
 }

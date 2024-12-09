@@ -14,7 +14,8 @@ export class UserSignInDto {
   active: boolean;
   @IsNotEmpty({ message: 'La contraseña no puede estar vacio' })
   @Matches(/(?=.*[0-9])(?=.*[A-Z])(?=.*[a-z])/, {
-    message: 'Password too weak',
+    message:
+      'La contraseña debe contener al menos una letra mayúscula, una letra minúscula y un número',
   })
   @MinLength(8, {
     message: 'La contraseña debe contar minimo con 8 caracteres',
