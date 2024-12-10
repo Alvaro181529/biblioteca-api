@@ -95,6 +95,7 @@ export class BooksService {
     book: BookEntity,
     createBookDto: CreateBookDto | UpdateBookDto,
     files: Array<Express.Multer.File>,
+    inventary?: string,
   ) {
     if (!Array.isArray(files)) return;
     const [imagen, file] = files;
@@ -104,12 +105,12 @@ export class BooksService {
     const imageOld = createBookDto.book_imagen;
     if (imagen) {
       if (imagen.mimetype === 'application/pdf') {
-        const newName = `${book.book_inventory}-${imagen.filename}`;
+        const newName = `${inventary || book?.book_inventory}-${imagen.filename}`;
         this.verifyFIle(documentOld, newName, 'document');
         book.book_document = newName;
         this.rename('document', imagen.filename, newName);
       } else {
-        const newName = `${book.book_inventory}-${imagen.filename}`;
+        const newName = `${inventary || book?.book_inventory}-${imagen.filename}`;
         this.verifyFIle(imageOld, newName, 'image');
         book.book_imagen = newName;
         this.rename('image', imagen.filename, newName);
@@ -117,12 +118,12 @@ export class BooksService {
     }
     if (file) {
       if (file.mimetype === 'application/pdf') {
-        const newName = `${book.book_inventory}-${file.filename}`;
+        const newName = `${inventary || book?.book_inventory}-${file.filename}`;
         this.verifyFIle(documentOld, newName, 'document');
         book.book_document = newName;
         this.rename('document', file.filename, newName);
       } else {
-        const newName = `${book.book_inventory}-${file.filename}`;
+        const newName = `${inventary || book?.book_inventory}-${file.filename}`;
         this.verifyFIle(imageOld, newName, 'image');
         book.book_imagen = newName;
         this.rename('image', file.filename, newName);
@@ -165,8 +166,6 @@ export class BooksService {
   async assingDto(book: BookEntity, createBookDto: any) {
     const { categories, authors, instruments } =
       await this.validateRefernce(createBookDto);
-    book.book_imagen = '';
-    book.book_document = '';
     book.book_title_original = createBookDto.book_title_original.toUpperCase();
     book.book_title_parallel = createBookDto.book_title_parallel?.toUpperCase();
     book.book_editorial = createBookDto.book_editorial?.toUpperCase();
@@ -199,6 +198,7 @@ export class BooksService {
     await this.assingDto(book, createBookDto);
     await this.countInventory(book, createBookDto);
     this.filesUpload(book, createBookDto, files);
+    console.log(book);
     try {
       return await this.bookRepository.save(book);
     } catch (error) {
@@ -371,7 +371,7 @@ export class BooksService {
     const inventary = book.book_inventory;
     Object.assign(book, updateBookDto);
     await this.assingDto(book, updateBookDto);
-    this.filesUpload(book, updateBookDto, files);
+    this.filesUpload(book, updateBookDto, files, inventary);
     book.book_inventory = inventary;
     if (updateBookDto.book_category?.length) book.book_category = categories;
     if (updateBookDto.book_instruments?.length)

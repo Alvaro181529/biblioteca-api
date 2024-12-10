@@ -26,7 +26,7 @@ export class BookEntity {
   @Column({ nullable: true })
   book_document: string;
 
-  @Column({ type: 'char', length: 15 })
+  @Column()
   book_inventory: string;
 
   @Column({ nullable: true })
