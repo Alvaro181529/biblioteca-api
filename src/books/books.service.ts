@@ -285,29 +285,41 @@ export class BooksService {
         searchType,
       });
     }
-    // Buscar por categorías
     if (searchCategories?.length) {
       query
         .leftJoinAndSelect('book.book_category', 'category')
-        .andWhere('category.name IN (:...searchCategories)', {
-          searchCategories,
-        });
+        .andWhere(
+          `unaccent(lower(category.category_name)) IN (:...searchCategories)`,
+          {
+            searchCategories: searchCategories.map((cat) => cat.toLowerCase()),
+          },
+        );
     }
-    // Buscar por autores
+
     if (searchAuthors?.length) {
       query
         .leftJoinAndSelect('book.book_authors', 'author')
-        .andWhere('author.name IN (:...searchAuthors)', { searchAuthors });
+        .andWhere(
+          `unaccent(lower(author.author_name)) IN (:...searchAuthors)`,
+          {
+            searchAuthors: searchAuthors.map((auth) => auth.toLowerCase()),
+          },
+        );
     }
 
-    // Buscar por instrumentos
     if (searchInstruments?.length) {
       query
         .leftJoinAndSelect('book.book_instruments', 'instrument')
-        .andWhere('instrument.name IN (:...searchInstruments)', {
-          searchInstruments,
-        });
+        .andWhere(
+          `unaccent(lower(instrument.instrument_name)) IN (:...searchInstruments)`,
+          {
+            searchInstruments: searchInstruments.map((instr) =>
+              instr.toLowerCase(),
+            ),
+          },
+        );
     }
+
     // Seleccionar los campos deseados
     query.select([
       'book.id',
