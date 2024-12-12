@@ -2,6 +2,7 @@ export enum Condition {
   BUENO = 'BUENO',
   REGULAR = 'REGULAR',
   MALO = 'MALO',
+  PESIMO = 'PÉSIMO',
 }
 export enum MediaType {
   BOOK = 'LIBRO',
