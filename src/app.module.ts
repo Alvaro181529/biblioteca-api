@@ -16,6 +16,7 @@ import { LikedModule } from './liked/liked.module';
 import { ContentsModule } from './contents/contents.module';
 import { ReportsModule } from './reports/reports.module';
 import { PrinterModule } from './printer/printer.module';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { PrinterModule } from './printer/printer.module';
     ContentsModule,
     ReportsModule,
     PrinterModule,
+    WhatsappModule,
   ],
   controllers: [SearchController],
   providers: [],
