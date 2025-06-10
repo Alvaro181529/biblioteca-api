@@ -23,18 +23,26 @@ import { AuthorizeGuard } from 'src/users/utilities/guards/authorization.guards'
 import { Roles } from 'src/users/utilities/common/user-role.enum';
 import { join } from 'path';
 import { Response } from 'express';
+import { CurrentUser } from 'src/users/utilities/decorators/current-user.decorator';
+import { UserEntity } from 'src/users/entities/user.entity';
 @Controller('books')
 export class BooksController {
   constructor(private readonly booksService: BooksService) {}
-  @UseGuards(AuthenticationGuard, AuthorizeGuard([Roles.ADMIN, Roles.ROOT]))
+  @UseGuards(
+    AuthenticationGuard,
+    AuthorizeGuard([Roles.ADMIN, Roles.ROOT, Roles.DOCENTE]),
+  )
   @Post()
   @UseInterceptors(FilesInterceptor('files', 2, multerOptions))
   async create(
     @Body() createBookDto: CreateBookDto,
     @UploadedFiles() files: Array<Express.Multer.File>,
+    @CurrentUser() currentUser: UserEntity,
   ): Promise<BookEntity> {
-    return await this.booksService.create(createBookDto, files);
+    return await this.booksService.create(createBookDto, files, currentUser);
   }
+
+  
 
   @Get()
   async findAll(
@@ -65,6 +73,41 @@ export class BooksController {
       searchInstrumentsArray,
     );
   }
+  @UseGuards(
+    AuthenticationGuard,
+    AuthorizeGuard([Roles.DOCENTE]),
+  )
+  @Get('mybooks')
+  async findMyBooks(
+    @Query('query') query: string = '',
+    @Query('type') type: string = '',
+    @Query('page') page: string = '1',
+    @Query('pageSize') pageSize: string = '10',
+    @Query('searchCategories') searchCategories: string = '',
+    @Query('searchAuthors') searchAuthors: string = '',
+    @Query('searchInstruments') searchInstruments: string = '',
+    @CurrentUser() currentUser: UserEntity,
+  ): Promise<any> {
+    const pageNumber = parseInt(page, 10);
+    const pageSizeNumber = parseInt(pageSize, 10);
+    const searchCategoriesArray = searchCategories
+      ? searchCategories.split(',')
+      : [];
+    const searchAuthorsArray = searchAuthors ? searchAuthors.split(',') : [];
+    const searchInstrumentsArray = searchInstruments
+      ? searchInstruments.split(',')
+      : [];
+    return await this.booksService.findMyBooks(
+      pageNumber,
+      pageSizeNumber,
+      query,
+      type,
+      searchCategoriesArray,
+      searchAuthorsArray,
+      searchInstrumentsArray,
+      currentUser,
+    );
+  }
   @Get('image/:filename')
   async getImage(@Param('filename') filename: string, @Res() res: Response) {
     // Ruta absoluta para las imágenes
@@ -79,7 +122,6 @@ export class BooksController {
     );
     return res.sendFile(filePath, (err) => {
       if (err) {
-        console.error('Error sending file:', err);
         return res
           .status(404)
           .json({ statusCode: 404, message: 'Image not found' });
@@ -101,7 +143,6 @@ export class BooksController {
     );
     return res.sendFile(filePath, (err) => {
       if (err) {
-        console.error('Error sending file:', err);
         return res
           .status(404)
           .json({ statusCode: 404, message: 'File not found' });
@@ -126,8 +167,14 @@ export class BooksController {
     @Param('id') id: string,
     @Body() updateBookDto: UpdateBookDto,
     @UploadedFiles() files: Array<Express.Multer.File>,
+    @CurrentUser() currentUser: UserEntity,
   ): Promise<BookEntity> {
-    return await this.booksService.update(+id, updateBookDto, files);
+    return await this.booksService.update(
+      +id,
+      updateBookDto,
+      files,
+      currentUser,
+    );
   }
   @UseGuards(AuthenticationGuard, AuthorizeGuard([Roles.ADMIN, Roles.ROOT]))
   @Patch(':id/deactivate')

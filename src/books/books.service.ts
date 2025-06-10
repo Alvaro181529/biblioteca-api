@@ -4,6 +4,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
+import levenshtein from 'fast-levenshtein';
 import { CreateBookDto } from './dto/create-book.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
 import { BookEntity } from './entities/book.entity';
@@ -18,6 +19,7 @@ import { ContentEntity } from 'src/contents/entities/content.entity';
 import { OrderStatus } from 'src/orders/utilities/common/order-status.enum';
 import * as fs from 'fs';
 import * as path from 'path';
+import { UserEntity } from 'src/users/entities/user.entity';
 
 @Injectable()
 export class BooksService {
@@ -30,6 +32,8 @@ export class BooksService {
     private readonly instrumentRepository: Repository<InstrumentEntity>,
     @InjectRepository(ContentEntity)
     private readonly contentRepository: Repository<ContentEntity>,
+    @InjectRepository(UserEntity)
+    private readonly userRepository: Repository<UserEntity>,
     @InjectRepository(CategoryEntity)
     private readonly categoryRepository: Repository<CategoryEntity>,
     private readonly currencyService: CurrencyService,
@@ -162,6 +166,94 @@ export class BooksService {
     if (Array.isArray(field)) return field;
     return [];
   };
+  // Similaridad basada en coincidencias de caracteres
+  private stringSimilarity(a: string, b: string): number {
+    const dist = levenshtein.get(a, b);
+    const maxLen = Math.max(a.length, b.length);
+    return 1 - dist / maxLen;
+  }
+
+  private probabilisticTitleChoice(pheromones: Record<string, number>): string {
+    const total = Object.values(pheromones).reduce((a, b) => a + b, 0);
+    const rand = Math.random() * total;
+    let cumulative = 0;
+    for (const [title, weight] of Object.entries(pheromones)) {
+      cumulative += weight;
+      if (rand <= cumulative) {
+        return title;
+      }
+    }
+    return Object.keys(pheromones)[0];
+  }
+  private async antColonySearch(
+    searchTerm: string,
+    titles: string[],
+    iterations = 10,
+    antsPerIteration = 20,
+    similarityThreshold = 0.7,
+  ): Promise<string | null> {
+    const pheromones: Record<string, number> = {};
+    for (const title of titles) {
+      pheromones[title] = 1;
+    }
+
+    for (let iter = 0; iter < iterations; iter++) {
+      for (let k = 0; k < antsPerIteration; k++) {
+        const title = this.probabilisticTitleChoice(pheromones);
+        const sim = this.stringSimilarity(
+          searchTerm.toLowerCase(),
+          title.toLowerCase(),
+        );
+
+        if (sim >= similarityThreshold) {
+          pheromones[title] += sim * 2;
+        } else {
+          pheromones[title] += sim * 0.5;
+        }
+      }
+
+      for (const title in pheromones) {
+        pheromones[title] *= 0.9;
+      }
+    }
+
+    const bestMatch = Object.entries(pheromones).reduce((a, b) =>
+      a[1] > b[1] ? a : b,
+    );
+
+    return bestMatch[1] >= similarityThreshold ? bestMatch[0] : null;
+  }
+  async preFilterBooks(searchTerm: string, threshold = 3): Promise<boolean> {
+    const allBooks = await this.bookRepository.find({
+      select: ['book_title_original'],
+    });
+    const lowerSearch = searchTerm.toLowerCase();
+
+    for (const book of allBooks) {
+      if (!book.book_title_original) continue;
+      const dist = levenshtein.get(
+        lowerSearch,
+        book.book_title_original.toLowerCase(),
+      );
+      if (dist <= threshold) {
+        return true;
+      }
+    }
+    return false;
+  }
+  // async preFilterBooks(searchTerm: string): Promise<boolean> {
+  //   const allBooks = await this.bookRepository.find({
+  //     select: ['book_title_original'],
+  //   });
+
+  //   const bookTitles = allBooks
+  //     .map((book) => book.book_title_original)
+  //     .filter((title): title is string => !!title);
+
+  //   const result = await this.antColonySearch(searchTerm, bookTitles);
+
+  //   return !!result;
+  // }
 
   async assingDto(book: BookEntity, createBookDto: any) {
     const { categories, authors, instruments } =
@@ -192,13 +284,14 @@ export class BooksService {
   async create(
     createBookDto: CreateBookDto,
     files: Array<Express.Multer.File>,
+    currentUser: UserEntity,
   ): Promise<BookEntity> {
     const book = new BookEntity();
     Object.assign(book, createBookDto);
     await this.assingDto(book, createBookDto);
     await this.countInventory(book, createBookDto);
     this.filesUpload(book, createBookDto, files);
-    console.log(book);
+    book.addedBy = currentUser;
     try {
       return await this.bookRepository.save(book);
     } catch (error) {
@@ -271,10 +364,131 @@ export class BooksService {
     const query = this.bookRepository.createQueryBuilder('book');
     // Si hay un término de búsqueda, agregar la cláusula WHERE
     if (searchTerm) {
+      const canSearch = await this.preFilterBooks(searchTerm);
+      if (!canSearch) {
+        return {
+          data: [],
+          total: 0,
+          currentPage: page,
+          totalPages: 0,
+          range: [],
+          message: 'No close matches found in titles',
+        };
+      }
       query.andWhere(
         `(
           similarity(unaccent_immutable(book.book_title_original), unaccent_immutable(:searchTerm)) > 0.3
-          OR similarity(unaccent_immutable(book.book_title_parallel), unaccent_immutable(:searchTerm)) > 0.3
+          OR similarity(unaccent_immutable(book.book_title_parallel), unaccent_immutable(:searchTerm)) > 0.2
+          OR book.book_headers ILIKE :searchTerm
+        )`,
+        { searchTerm: `%${searchTerm.toLowerCase()}%` },
+      );
+    }
+    if (searchType) {
+      query.andWhere(`book.book_type = :searchType`, {
+        searchType,
+      });
+    }
+    if (searchCategories?.length) {
+      query
+        .leftJoinAndSelect('book.book_category', 'category')
+        .andWhere(
+          `unaccent(lower(category.category_name)) IN (:...searchCategories)`,
+          {
+            searchCategories: searchCategories.map((cat) => cat.toLowerCase()),
+          },
+        );
+    }
+
+    if (searchAuthors?.length) {
+      query
+        .leftJoinAndSelect('book.book_authors', 'author')
+        .andWhere(
+          `unaccent(lower(author.author_name)) IN (:...searchAuthors)`,
+          {
+            searchAuthors: searchAuthors.map((auth) => auth.toLowerCase()),
+          },
+        );
+    }
+
+    if (searchInstruments?.length) {
+      query
+        .leftJoinAndSelect('book.book_instruments', 'instrument')
+        .andWhere(
+          `unaccent(lower(instrument.instrument_name)) IN (:...searchInstruments)`,
+          {
+            searchInstruments: searchInstruments.map((instr) =>
+              instr.toLowerCase(),
+            ),
+          },
+        );
+    }
+
+    // Seleccionar los campos deseados
+    query.select([
+      'book.id',
+      'book.book_imagen',
+      'book.book_headers',
+      'book.book_inventory',
+      'book.book_type',
+      'book.book_condition',
+      'book.book_location',
+      'book.book_title_original',
+      'book.book_title_parallel',
+      'book.book_language',
+      'book.book_quantity',
+      'book.book_observation',
+    ]);
+    query.orderBy({
+      'book.book_type': 'ASC',
+      'book.book_create_at': 'ASC',
+    });
+    const [data, total] = await query.getManyAndCount();
+    const paginatedResult = this.paginacionService.paginate(
+      data,
+      page,
+      pageSize,
+      total,
+    );
+
+    return {
+      data: paginatedResult.data,
+      total: paginatedResult.total,
+      currentPage: paginatedResult.currentPage,
+      totalPages: paginatedResult.totalPages,
+      range: paginatedResult.range,
+    };
+  }
+
+  async findMyBooks(
+    page: number = 1,
+    pageSize: number = 10,
+    searchTerm: string = '',
+    searchType: string = '',
+    searchCategories: string[] = [],
+    searchAuthors: string[] = [],
+    searchInstruments: string[] = [],
+    currentUser:UserEntity
+  ): Promise<any> {
+    const query = this.bookRepository.createQueryBuilder('book');
+    query.andWhere(`book.addedBy = :currentUser`, { currentUser: currentUser.id });
+    // Si hay un término de búsqueda, agregar la cláusula WHERE
+    if (searchTerm) {
+      const canSearch = await this.preFilterBooks(searchTerm);
+      if (!canSearch) {
+        return {
+          data: [],
+          total: 0,
+          currentPage: page,
+          totalPages: 0,
+          range: [],
+          message: 'No close matches found in titles',
+        };
+      }
+      query.andWhere(
+        `(
+          similarity(unaccent_immutable(book.book_title_original), unaccent_immutable(:searchTerm)) > 0.3
+          OR similarity(unaccent_immutable(book.book_title_parallel), unaccent_immutable(:searchTerm)) > 0.2
           OR book.book_headers ILIKE :searchTerm
         )`,
         { searchTerm: `%${searchTerm.toLowerCase()}%` },
@@ -375,6 +589,7 @@ export class BooksService {
     id: number,
     updateBookDto: UpdateBookDto,
     files: Array<Express.Multer.File>,
+    currentUser: UserEntity,
   ): Promise<BookEntity> {
     const book = await this.bookRepository.findOne({ where: { id } });
     if (!book) throw new NotFoundException(`Book with ID ${id} not found`);
@@ -385,6 +600,7 @@ export class BooksService {
     await this.assingDto(book, updateBookDto);
     this.filesUpload(book, updateBookDto, files, inventary);
     book.book_inventory = inventary;
+    book.addedBy = currentUser;
     if (updateBookDto.book_category?.length) book.book_category = categories;
     if (updateBookDto.book_instruments?.length)
       book.book_instruments = instruments;

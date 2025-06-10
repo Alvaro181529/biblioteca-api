@@ -24,6 +24,7 @@ async function bootstrap() {
       whitelist: true,
     }),
   );
+  app.enableCors();
   app.setGlobalPrefix('api/v2');
   await app.listen(process.env.PORT ?? 4000);
 }

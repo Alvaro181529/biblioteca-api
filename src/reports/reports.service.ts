@@ -3,7 +3,7 @@ import { PrinterService } from 'src/printer/printer.service';
 import { Reports } from './documents/document.report';
 import { InjectRepository } from '@nestjs/typeorm';
 import { BookEntity } from 'src/books/entities/book.entity';
-import { Repository } from 'typeorm';
+import { Between, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { OrderEntity } from 'src/orders/entites/order.entity';
 
@@ -18,8 +18,20 @@ export class ReportsService {
     @InjectRepository(OrderEntity)
     private readonly orderRepository: Repository<OrderEntity>,
   ) {}
-  async getBooksReport(): Promise<PDFKit.PDFDocument> {
+  async getBooksReport(
+    startDate?: string,
+    endDate?: string,
+  ): Promise<PDFKit.PDFDocument> {
+    const where: any = {};
+    if (startDate != 'null' && endDate != 'null') {
+      where.book_create_at = Between(startDate, endDate);
+    } else if (startDate != 'null') {
+      where.book_create_at = MoreThanOrEqual(startDate);
+    } else if (endDate != 'null') {
+      where.book_create_at = LessThanOrEqual(endDate);
+    }
     const data = await this.bookRepository.find({
+      where,
       relations: { book_authors: true },
       order: {
         book_type: 'ASC',
@@ -123,18 +135,16 @@ export class ReportsService {
       { text: 'NOMBRE', bold: true },
       { text: 'CORREO', bold: true },
       { text: 'ESTADO', bold: true },
-      { text: 'FECHA', bold: true },
       { text: 'LIBROS', bold: true },
     ];
-    const widths = ['auto', '*', 'auto', 'auto', 'auto', '*'];
+    const widths = ['auto', '*', 'auto', 'auto', '*'];
     const mapFn = (order: OrderEntity, index: number) => [
       { text: index + 1, margin: [0, 5] },
       { text: order.user.name, margin: [0, 5] },
       { text: order.user.email, margin: [0, 5] },
-      { text: order.order_status, margin: [0, 5] },
       {
         text: order.order_regresado_at
-          ? new Date(order.order_regresado_at).toLocaleDateString('es-ES')
+          ? `${order.order_status} EN  ${new Date(order.order_regresado_at).toLocaleDateString('es-ES')}`
           : 'Sin Regresar',
         margin: [0, 5],
       },

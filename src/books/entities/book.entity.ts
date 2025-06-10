@@ -2,20 +2,23 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinTable,
   ManyToMany,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
   Timestamp,
   UpdateDateColumn,
 } from 'typeorm';
-import { Condition, MediaType } from '../utilities/common/book-dondition.enum';
+import { Condition, MediaType } from '../utilities/common/book-condition.enum';
 import { CategoryEntity } from 'src/categories/entities/category.entity';
 import { AuthorEntity } from 'src/authors/entities/author.entity';
 import { InstrumentEntity } from 'src/instruments/entities/instrument.entity';
 import { OrderEntity } from 'src/orders/entites/order.entity';
 import { ContentEntity } from 'src/contents/entities/content.entity';
 import { Exclude } from 'class-transformer';
+import { UserEntity } from 'src/users/entities/user.entity';
 @Entity('books')
 export class BookEntity {
   @PrimaryGeneratedColumn()
@@ -23,6 +26,7 @@ export class BookEntity {
 
   @Column({ nullable: true })
   book_imagen: string;
+  
   @Column({ nullable: true })
   book_document: string;
 
@@ -32,9 +36,11 @@ export class BookEntity {
   @Column({ nullable: true })
   book_isbn: string;
 
+  @Index('IDX_BOOK_TITLE')
   @Column()
   book_title_original: string;
 
+  @Index('IDX_BOOK_TITLE_PARALLEL')
   @Column({ nullable: true })
   book_title_parallel: string;
 
@@ -125,7 +131,6 @@ export class BookEntity {
     inverseJoinColumn: { name: 'author_id', referencedColumnName: 'id' },
   })
   book_authors: AuthorEntity[];
-
   @ManyToMany(() => InstrumentEntity, (author) => author.books, {
     cascade: true,
     nullable: true,
@@ -158,4 +163,7 @@ export class BookEntity {
     nullable: true,
   })
   book_update_at: Timestamp;
+
+  @ManyToOne(() => UserEntity, (user) => user.books, { nullable: true })
+  addedBy: UserEntity;
 }
