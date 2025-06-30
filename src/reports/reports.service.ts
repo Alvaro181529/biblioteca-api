@@ -6,6 +6,8 @@ import { BookEntity } from 'src/books/entities/book.entity';
 import { Between, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { OrderEntity } from 'src/orders/entites/order.entity';
+import { AnalyticsService } from 'src/analytics/analytics.service';
+import { ReportAnalytics } from './documents/analytics.report';
 
 @Injectable()
 export class ReportsService {
@@ -17,7 +19,8 @@ export class ReportsService {
     private readonly userRepository: Repository<UserEntity>,
     @InjectRepository(OrderEntity)
     private readonly orderRepository: Repository<OrderEntity>,
-  ) {}
+    private readonly analyticsService: AnalyticsService,
+  ) { }
   async getBooksReport(
     startDate?: string,
     endDate?: string,
@@ -56,21 +59,21 @@ export class ReportsService {
       { text: book.book_title_original || 'Sin Título', margin: [0, 8] },
       book.book_authors && book.book_authors.length > 0
         ? {
-            ul: book.book_authors.map((author) => author.author_name),
-            margin: [0, 4],
-          }
+          ul: book.book_authors.map((author) => author.author_name),
+          margin: [0, 4],
+        }
         : { text: 'N/A', margin: [0, 8] },
       { text: book.book_condition, margin: [0, 8] },
       {
         text:
           book.book_price_type && book.book_original_price
             ? `(${book.book_price_type.replace(/\s+/g, '')}) ${Intl.NumberFormat(
-                'en-US',
-                {
-                  style: 'currency',
-                  currency: 'USD',
-                },
-              ).format(book.book_original_price)}`
+              'en-US',
+              {
+                style: 'currency',
+                currency: 'USD',
+              },
+            ).format(book.book_original_price)}`
             : 'Desconocida',
         bold: true,
         alignment: 'right',
@@ -150,9 +153,9 @@ export class ReportsService {
       },
       order.books
         ? {
-            text: order.books.map((book) => book.book_title_original),
-            margin: [0, 4],
-          }
+          text: order.books.map((book) => book.book_title_original),
+          margin: [0, 4],
+        }
         : { text: 'N/A', margin: [0, 8] },
     ];
     const docDefinition = Reports(
@@ -163,5 +166,22 @@ export class ReportsService {
       mapFn,
     );
     return this.printer.createPdf(docDefinition);
+  }
+
+  async getAnalyticsReport() {
+    const booksCount = await this.analyticsService.getBooksCount();
+    const booksValueByType = await this.analyticsService.getBooksValueByType();
+    const booksConditionAndTypeCount = await this.analyticsService.getBooksConditionAndTypeCount();
+    const popularBooks = await this.analyticsService.getBooksCountPopular();
+    const borrowedBooks = await this.analyticsService.getBooksBorrowed();
+
+    const docDefinition = ReportAnalytics({
+      booksCount,
+      booksValueByType,
+      booksConditionAndTypeCount,
+      popularBooks,
+      borrowedBooks,
+    });
+    return this.printer.createPdf(docDefinition)
   }
 }
