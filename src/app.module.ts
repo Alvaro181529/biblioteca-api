@@ -18,6 +18,7 @@ import { ReportsModule } from './reports/reports.module';
 import { PrinterModule } from './printer/printer.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { LogsModule } from './logs/logs.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
     PrinterModule,
     WhatsappModule,
     AnalyticsModule,
+    LogsModule,
   ],
   controllers: [SearchController],
   providers: [],

@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { LoggingInterceptor } from './logs/interceptor/logging.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -26,6 +27,6 @@ async function bootstrap() {
   );
   app.enableCors();
   app.setGlobalPrefix('api/v2');
-  await app.listen(process.env.PORT ?? 4000);
+    await app.listen(process.env.PORT ?? 4000);
 }
 bootstrap();

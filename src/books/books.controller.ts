@@ -129,6 +129,10 @@ export class BooksController {
     });
   }
 
+  @Get('/files/:id')
+  async findOneSound(@Param('id') id: string): Promise<BookEntity | {message:string}> {
+    return await this.booksService.findOneSound(+id);
+  }
   @Get('document/:filename')
   async getPdf(@Param('filename') filename: string, @Res() res: Response) {
     // Ruta absoluta para los archivos PDF

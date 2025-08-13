@@ -4,7 +4,6 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import levenshtein from 'fast-levenshtein';
 import { CreateBookDto } from './dto/create-book.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
 import { BookEntity } from './entities/book.entity';
@@ -20,6 +19,8 @@ import { OrderStatus } from 'src/orders/utilities/common/order-status.enum';
 import * as fs from 'fs';
 import * as path from 'path';
 import { UserEntity } from 'src/users/entities/user.entity';
+import { ExportImport } from './utilities/common/book-export.service';
+import { prioritizeBooksACO } from './utilities/common/book-algoritm.service';
 
 @Injectable()
 export class BooksService {
@@ -38,7 +39,7 @@ export class BooksService {
     private readonly categoryRepository: Repository<CategoryEntity>,
     private readonly currencyService: CurrencyService,
     private readonly paginacionService: PaginacionService,
-  ) {}
+  ) { }
   async validateRefernce(BookDto: any) {
     const [categories, authors, instruments] = await Promise.all([
       this.categoryRepository.findBy({ id: In(BookDto.book_category) }),
@@ -166,94 +167,7 @@ export class BooksService {
     if (Array.isArray(field)) return field;
     return [];
   };
-  // Similaridad basada en coincidencias de caracteres
-  private stringSimilarity(a: string, b: string): number {
-    const dist = levenshtein.get(a, b);
-    const maxLen = Math.max(a.length, b.length);
-    return 1 - dist / maxLen;
-  }
 
-  private probabilisticTitleChoice(pheromones: Record<string, number>): string {
-    const total = Object.values(pheromones).reduce((a, b) => a + b, 0);
-    const rand = Math.random() * total;
-    let cumulative = 0;
-    for (const [title, weight] of Object.entries(pheromones)) {
-      cumulative += weight;
-      if (rand <= cumulative) {
-        return title;
-      }
-    }
-    return Object.keys(pheromones)[0];
-  }
-  private async antColonySearch(
-    searchTerm: string,
-    titles: string[],
-    iterations = 10,
-    antsPerIteration = 20,
-    similarityThreshold = 0.7,
-  ): Promise<string | null> {
-    const pheromones: Record<string, number> = {};
-    for (const title of titles) {
-      pheromones[title] = 1;
-    }
-
-    for (let iter = 0; iter < iterations; iter++) {
-      for (let k = 0; k < antsPerIteration; k++) {
-        const title = this.probabilisticTitleChoice(pheromones);
-        const sim = this.stringSimilarity(
-          searchTerm.toLowerCase(),
-          title.toLowerCase(),
-        );
-
-        if (sim >= similarityThreshold) {
-          pheromones[title] += sim * 2;
-        } else {
-          pheromones[title] += sim * 0.5;
-        }
-      }
-
-      for (const title in pheromones) {
-        pheromones[title] *= 0.9;
-      }
-    }
-
-    const bestMatch = Object.entries(pheromones).reduce((a, b) =>
-      a[1] > b[1] ? a : b,
-    );
-
-    return bestMatch[1] >= similarityThreshold ? bestMatch[0] : null;
-  }
-  async preFilterBooks(searchTerm: string, threshold = 3): Promise<boolean> {
-    const allBooks = await this.bookRepository.find({
-      select: ['book_title_original'],
-    });
-    const lowerSearch = searchTerm.toLowerCase();
-
-    for (const book of allBooks) {
-      if (!book.book_title_original) continue;
-      const dist = levenshtein.get(
-        lowerSearch,
-        book.book_title_original.toLowerCase(),
-      );
-      if (dist <= threshold) {
-        return true;
-      }
-    }
-    return false;
-  }
-  // async preFilterBooks(searchTerm: string): Promise<boolean> {
-  //   const allBooks = await this.bookRepository.find({
-  //     select: ['book_title_original'],
-  //   });
-
-  //   const bookTitles = allBooks
-  //     .map((book) => book.book_title_original)
-  //     .filter((title): title is string => !!title);
-
-  //   const result = await this.antColonySearch(searchTerm, bookTitles);
-
-  //   return !!result;
-  // }
 
   async assingDto(book: BookEntity, createBookDto: any) {
     const { categories, authors, instruments } =
@@ -276,9 +190,9 @@ export class BooksService {
         ? book.book_original_price
         : book.book_price_type
           ? await this.currencyService.convertToBolivianos(
-              book.book_original_price,
-              book.book_price_type,
-            )
+            book.book_original_price,
+            book.book_price_type,
+          )
           : 0;
   }
   async create(
@@ -364,22 +278,12 @@ export class BooksService {
     const query = this.bookRepository.createQueryBuilder('book');
     // Si hay un término de búsqueda, agregar la cláusula WHERE
     if (searchTerm) {
-      const canSearch = await this.preFilterBooks(searchTerm);
-      if (!canSearch) {
-        return {
-          data: [],
-          total: 0,
-          currentPage: page,
-          totalPages: 0,
-          range: [],
-          message: 'No close matches found in titles',
-        };
-      }
+
       query.andWhere(
         `(
-          similarity(unaccent_immutable(book.book_title_original), unaccent_immutable(:searchTerm)) > 0.3
+          book.book_headers ILIKE :searchTerm
           OR similarity(unaccent_immutable(book.book_title_parallel), unaccent_immutable(:searchTerm)) > 0.2
-          OR book.book_headers ILIKE :searchTerm
+          OR similarity(unaccent_immutable(book.book_title_original), unaccent_immutable(:searchTerm)) > 0.3
         )`,
         { searchTerm: `%${searchTerm.toLowerCase()}%` },
       );
@@ -451,8 +355,10 @@ export class BooksService {
       total,
     );
 
+    const booksFilters = await prioritizeBooksACO(searchTerm, paginatedResult.data);
+
     return {
-      data: paginatedResult.data,
+      data: booksFilters,
       total: paginatedResult.total,
       currentPage: paginatedResult.currentPage,
       totalPages: paginatedResult.totalPages,
@@ -468,28 +374,17 @@ export class BooksService {
     searchCategories: string[] = [],
     searchAuthors: string[] = [],
     searchInstruments: string[] = [],
-    currentUser:UserEntity
+    currentUser: UserEntity
   ): Promise<any> {
     const query = this.bookRepository.createQueryBuilder('book');
     query.andWhere(`book.addedBy = :currentUser`, { currentUser: currentUser.id });
     // Si hay un término de búsqueda, agregar la cláusula WHERE
     if (searchTerm) {
-      const canSearch = await this.preFilterBooks(searchTerm);
-      if (!canSearch) {
-        return {
-          data: [],
-          total: 0,
-          currentPage: page,
-          totalPages: 0,
-          range: [],
-          message: 'No close matches found in titles',
-        };
-      }
       query.andWhere(
         `(
-          similarity(unaccent_immutable(book.book_title_original), unaccent_immutable(:searchTerm)) > 0.3
+          book.book_headers ILIKE :searchTerm
           OR similarity(unaccent_immutable(book.book_title_parallel), unaccent_immutable(:searchTerm)) > 0.2
-          OR book.book_headers ILIKE :searchTerm
+          OR similarity(unaccent_immutable(book.book_title_original), unaccent_immutable(:searchTerm)) > 0.3
         )`,
         { searchTerm: `%${searchTerm.toLowerCase()}%` },
       );
@@ -560,7 +455,6 @@ export class BooksService {
       pageSize,
       total,
     );
-
     return {
       data: paginatedResult.data,
       total: paginatedResult.total,
@@ -584,6 +478,27 @@ export class BooksService {
 
     return book;
   }
+  async findOneSound(id: number): Promise<BookEntity | { message: string }> {
+    if (process.env.EXPORTS_CONVERT === 'true') {
+      const book = await this.bookRepository.findOne({ where: { id: Number(id) } });
+      if (!book) throw new NotFoundException(`Book with ID ${id} not found`);
+      const NombreDocumento = book.book_document;
+      const CodigoInventario = book.book_inventory;
+      let data: any
+      if (CodigoInventario && NombreDocumento) {
+        data = await ExportImport(CodigoInventario, NombreDocumento);
+      }
+      data = {
+        midi_url: process.env.EXPORTS_CONVERT_URL + data.midi_url,
+        mxl_url: process.env.EXPORTS_CONVERT_URL + data.mxl_url
+      }
+      console.log(data);
+      return data;
+    } else {
+      return { message: "File conversion is not enabled." };
+    }
+  }
+
 
   async update(
     id: number,
