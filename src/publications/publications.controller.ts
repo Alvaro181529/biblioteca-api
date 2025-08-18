@@ -11,6 +11,7 @@ import {
   UseInterceptors,
   UploadedFile,
   Res,
+  BadRequestException,
 } from '@nestjs/common';
 import { PublicationsService } from './publications.service';
 import { CreatePublicationDto } from './dto/create-publication.dto';
@@ -26,7 +27,7 @@ import { Response } from 'express';
 
 @Controller('publications')
 export class PublicationsController {
-  constructor(private readonly publicationsService: PublicationsService) {}
+  constructor(private readonly publicationsService: PublicationsService) { }
   @UseGuards(AuthenticationGuard, AuthorizeGuard([Roles.ADMIN, Roles.ROOT]))
   @Post()
   @UseInterceptors(FileInterceptor('file', multerOptions))
@@ -63,7 +64,7 @@ export class PublicationsController {
     );
     return res.sendFile(filePath, (err) => {
       if (err) {
-        console.error('Error sending file:', err);
+        throw new BadRequestException('Error sending file:' + err);
         return res
           .status(404)
           .json({ statusCode: 404, message: 'Image not found' });

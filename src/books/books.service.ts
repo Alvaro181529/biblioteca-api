@@ -21,6 +21,8 @@ import * as path from 'path';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { ExportImport } from './utilities/common/book-export.service';
 import { prioritizeBooksACO } from './utilities/common/book-algoritm.service';
+import { performance } from 'perf_hooks';
+import { MemcachedService } from 'src/memcached/memcached.service';
 
 @Injectable()
 export class BooksService {
@@ -39,6 +41,7 @@ export class BooksService {
     private readonly categoryRepository: Repository<CategoryEntity>,
     private readonly currencyService: CurrencyService,
     private readonly paginacionService: PaginacionService,
+    private readonly memcachedService: MemcachedService,
   ) { }
   async validateRefernce(BookDto: any) {
     const [categories, authors, instruments] = await Promise.all([
@@ -49,7 +52,7 @@ export class BooksService {
       }),
     ]);
 
-    // Definir las validaciones en un mapa
+
     const validations: [any[], number, string][] = [
       [categories, BookDto.book_category.length, 'Some categories not found.'],
       [
@@ -88,8 +91,7 @@ export class BooksService {
     if (!fs.existsSync(filePath)) return;
     fs.unlink(filePath, (err) => {
       if (err) {
-        console.error(`Error al eliminar el archivo: ${filePath}`, err);
-        return;
+        throw new BadRequestException('Error al eliminar el archivo')
       }
     });
   }
@@ -221,7 +223,7 @@ export class BooksService {
       },
       take: 6,
     });
-    return books; // O lo que desees retornar
+    return books;
   }
   async searchBooks(
     searchTerm: string,
@@ -275,10 +277,22 @@ export class BooksService {
     searchAuthors: string[] = [],
     searchInstruments: string[] = [],
   ): Promise<any> {
-    const query = this.bookRepository.createQueryBuilder('book');
-    // Si hay un término de búsqueda, agregar la cláusula WHERE
-    if (searchTerm) {
+    const start = performance.now();
 
+    const query = this.bookRepository.createQueryBuilder('book');
+
+    let booksFilters: BookEntity[] | null = null;
+
+    const cacheKey = `books_${page}_${pageSize}_${searchTerm.toLowerCase().replace(/\s+/g, '_')}_${searchType}_${searchCategories.join(',')}_${searchAuthors.join(',')}_${searchInstruments.join(',')}`;
+
+
+    const cachedResult = await this.memcachedService.getCache(cacheKey);
+    if (cachedResult) {
+      const end = performance.now();
+      console.log(`Database query took ${end - start} milliseconds`);
+      return cachedResult;
+    }
+    if (searchTerm) {
       query.andWhere(
         `(
           book.book_headers ILIKE :searchTerm
@@ -328,7 +342,7 @@ export class BooksService {
         );
     }
 
-    // Seleccionar los campos deseados
+
     query.select([
       'book.id',
       'book.book_imagen',
@@ -354,11 +368,17 @@ export class BooksService {
       pageSize,
       total,
     );
-
-    const booksFilters = await prioritizeBooksACO(searchTerm, paginatedResult.data);
-
+    const end = performance.now();
+    console.log(`Database query took ${end - start} milliseconds`);
+    if (searchTerm) {
+      const start = performance.now();
+      booksFilters = await prioritizeBooksACO(searchTerm, paginatedResult.data);
+      const end = performance.now();
+      console.log(`Database query took ${end - start} milliseconds`);
+    }
+    this.memcachedService.setCache(cacheKey, paginatedResult);
     return {
-      data: booksFilters,
+      data: booksFilters ? booksFilters : paginatedResult.data,
       total: paginatedResult.total,
       currentPage: paginatedResult.currentPage,
       totalPages: paginatedResult.totalPages,
@@ -376,9 +396,18 @@ export class BooksService {
     searchInstruments: string[] = [],
     currentUser: UserEntity
   ): Promise<any> {
+    const cacheKey = `books_${page}_${pageSize}_${searchTerm.toLowerCase().replace(/\s+/g, '_')}_${searchType}_${searchCategories.join(',')}_${searchAuthors.join(',')}_${searchInstruments.join(',')}`;
+    const start = performance.now();
+
+    const cachedResult = await this.memcachedService.getCache(cacheKey);
+    if (cachedResult) {
+      const end = performance.now();
+      console.log(`Database query took ${end - start} milliseconds`);
+      return cachedResult;
+    }
     const query = this.bookRepository.createQueryBuilder('book');
     query.andWhere(`book.addedBy = :currentUser`, { currentUser: currentUser.id });
-    // Si hay un término de búsqueda, agregar la cláusula WHERE
+
     if (searchTerm) {
       query.andWhere(
         `(
@@ -429,7 +458,7 @@ export class BooksService {
         );
     }
 
-    // Seleccionar los campos deseados
+
     query.select([
       'book.id',
       'book.book_imagen',
@@ -455,6 +484,7 @@ export class BooksService {
       pageSize,
       total,
     );
+    this.memcachedService.setCache(cacheKey, paginatedResult);
     return {
       data: paginatedResult.data,
       total: paginatedResult.total,
@@ -465,6 +495,12 @@ export class BooksService {
   }
 
   async findOne(id: number): Promise<BookEntity> {
+    const cacheKey = `book_${id}`;
+    const cachedBook = await this.memcachedService.getCache(cacheKey);
+    if (cachedBook) {
+      return cachedBook;
+    }
+
     const book = await this.bookRepository.findOne({
       where: { id },
       relations: {
@@ -474,7 +510,11 @@ export class BooksService {
         book_contents: true,
       },
     });
-    if (!book) throw new NotFoundException(`Book with ID ${id} not found`);
+    if (!book) {
+      throw new NotFoundException(`Book with ID ${id} not found`);
+    }
+
+    this.memcachedService.setCache(cacheKey, book);
 
     return book;
   }
@@ -492,7 +532,6 @@ export class BooksService {
         midi_url: process.env.EXPORTS_CONVERT_URL + data.midi_url,
         mxl_url: process.env.EXPORTS_CONVERT_URL + data.mxl_url
       }
-      console.log(data);
       return data;
     } else {
       return { message: "File conversion is not enabled." };

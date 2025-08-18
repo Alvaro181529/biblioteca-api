@@ -55,7 +55,7 @@ export async function prioritizeBooksACO(
       levenshtein(searchTerm, book.book_title_parallel || '')
     );
 
-    const simScore = 1 - levDist / (maxLevenshtein || 1); // Normalizado [0,1]
+    const simScore = 1 - levDist / (maxLevenshtein || 1);
     const conditionScore = (conditionWeights[book.book_condition] || 1) / 3;
     const languageScore = book.book_language === options.preferredLanguage ? 1 : 0;
     const quantityScore = Math.min(book.book_quantity / 10, 1);
@@ -117,7 +117,7 @@ export async function prioritizeBooksACO(
       }
     }
 
-    // Evaporación y refuerzo
+  
     pheromone.forEach((_, i) => (pheromone[i] *= 0.9));
     bestPath.forEach(i => {
       pheromone[i] += bestScore / 100;
@@ -125,5 +125,5 @@ export async function prioritizeBooksACO(
   }
 
   const result = bestPath.map(i => books[i]);
-  return result; // Todos los libros, pero ordenados por prioridad
+  return result;
 }

@@ -262,7 +262,7 @@ export class OrdersService {
       if (quantity !== undefined) {
         await this.bookService.UpdateBook(op.id, quantity, status);
       } else {
-        console.error(
+        throw new BadRequestException(
           `Quantity for book ID ${op.id} not found in book_quantities`,
         );
       }

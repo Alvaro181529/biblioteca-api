@@ -13,6 +13,7 @@ import { AuthorsModule } from 'src/authors/authors.module';
 import { InstrumentEntity } from 'src/instruments/entities/instrument.entity';
 import { ContentEntity } from 'src/contents/entities/content.entity';
 import { UserEntity } from 'src/users/entities/user.entity';
+import { MemcachedService } from 'src/memcached/memcached.service';
 
 @Module({
   imports: [
@@ -30,7 +31,7 @@ import { UserEntity } from 'src/users/entities/user.entity';
     CategoriesModule,
   ],
   controllers: [BooksController],
-  providers: [BooksService, CurrencyService],
+  providers: [BooksService, CurrencyService, MemcachedService],
   exports: [BooksService],
 })
 export class BooksModule {}

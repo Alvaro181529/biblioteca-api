@@ -19,6 +19,8 @@ import { PrinterModule } from './printer/printer.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { LogsModule } from './logs/logs.module';
+import { MemcachedService } from './memcached/memcached.service';
+import { BackupModule } from './backup/backup.module';
 
 @Module({
   imports: [
@@ -39,9 +41,10 @@ import { LogsModule } from './logs/logs.module';
     WhatsappModule,
     AnalyticsModule,
     LogsModule,
+    BackupModule,
   ],
   controllers: [SearchController],
-  providers: [],
+  providers: [MemcachedService],
 })
 export class AppModule {
   configure(consumer: MiddlewareConsumer) {

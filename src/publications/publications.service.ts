@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -40,7 +41,7 @@ export class PublicationsService {
     if (!fs.existsSync(filePath)) return;
     fs.unlink(filePath, (err) => {
       if (err) {
-        console.error(`Error al eliminar el archivo: ${filePath}`, err);
+        throw new BadRequestException(`Error al eliminar el archivo}`);
         return;
       }
     });

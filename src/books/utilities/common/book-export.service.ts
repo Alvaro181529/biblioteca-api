@@ -1,4 +1,4 @@
-import { BadGatewayException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException } from '@nestjs/common';
 import axios from 'axios';
 import FormData from 'form-data';
 import * as fs from 'fs';
@@ -20,10 +20,10 @@ async function Virify(inventario: string, fastApiUrlSearch: string) {
 
         const res_midi = response.data.midi_exists
         const res_mxl = response.data.mxl_exists
-        if (res_midi && res_mxl)    
+        if (res_midi && res_mxl)
             return response.data
     } catch (error: any) {
-        throw new BadGatewayException (
+        throw new BadGatewayException(
             'Error send file: ' + error.message,
         );
     }
@@ -32,7 +32,7 @@ async function FilesCreate(inventario: string, file: string, fastApiUrl: string)
     const uploadsDir = path.join('./uploads/document');
     const pdfPath = path.join(uploadsDir, file);
     if (!fs.existsSync(pdfPath)) {
-        console.error('El archivo PDF no existe:', pdfPath);
+        throw new BadRequestException('El archivo PDF no existe:', pdfPath);
         return;
     }
     const form = new FormData();
@@ -47,6 +47,6 @@ async function FilesCreate(inventario: string, file: string, fastApiUrl: string)
 
         return response.data
     } catch (error: any) {
-        console.error('Error al enviar archivo a FastAPI:', error.response?.data || error.message);
+        throw new BadRequestException('Error al enviar archivo a FastAPI:', error.response?.data || error.message);
     }
 }
