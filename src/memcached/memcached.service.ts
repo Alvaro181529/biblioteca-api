@@ -92,9 +92,8 @@ export class MemcachedService {
   constructor() {
     // Leer si Memcached está habilitado o no desde el entorno
     this.isMemcachedEnabled = process.env.MEMCACHED_ENABLED === 'true';
-    console.log('Valor de MEMCACHED_ENABLED:', this.isMemcachedEnabled);
+
     if (this.isMemcachedEnabled) {
-      console.log('Memcached está habilitado.');
       const host: string = process.env.MEMCACHED_HOST || 'localhost';
       const port: string = process.env.MEMCACHED_PORT || '11211';
 
@@ -194,5 +193,8 @@ export class MemcachedService {
         throw new BadRequestException('Error al limpiar la caché de Memcached:', err);
       }
     });
+  }
+  async deleteByPattern(patern: string): Promise<any> {
+    console.log(patern);
   }
 }

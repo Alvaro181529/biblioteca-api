@@ -11,6 +11,7 @@ import { BookEntity } from 'src/books/entities/book.entity';
 import { Repository } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
 import { PaginacionService } from 'src/pagination/pagination.service';
+import { MemcachedService } from 'src/memcached/memcached.service';
 
 @Injectable()
 export class ContentsService {
@@ -20,12 +21,23 @@ export class ContentsService {
     @InjectRepository(BookEntity)
     private readonly bookRepository: Repository<BookEntity>,
     private readonly paginacionService: PaginacionService,
-  ) {}
+    private readonly memcachedService: MemcachedService,
+  ) { }
   async searchContent(
     searchTerm: string,
     page: number = 1,
     pageSize: number = 10,
   ): Promise<any> {
+    const cacheKey = `content_search_${page}_${pageSize}_${searchTerm.toLowerCase().replace(/\s+/g, '_')}`;
+
+    const start = performance.now();
+
+    const cachedResult = await this.memcachedService.getCache(cacheKey);
+    if (cachedResult) {
+      const end = performance.now();
+      // console.log(`Database query took ${end - start} milliseconds`);
+      return cachedResult;
+    }
     const search = searchTerm.toLowerCase();
 
     const [data, total] = await this.contentRepository
@@ -45,7 +57,7 @@ export class ContentsService {
       pageSize,
       total,
     );
-
+    this.memcachedService.setCache(cacheKey, paginatedResult);
     return {
       data: paginatedResult.data,
       total: paginatedResult.total,
@@ -89,7 +101,7 @@ export class ContentsService {
       const result = plainToInstance(ContentEntity, newContents, {
         excludeExtraneousValues: true,
       });
-
+      await this.memcachedService.flushCache();
       return result;
     } catch (error) {
       throw new BadRequestException('Failed to create contents.' + error);
@@ -101,12 +113,23 @@ export class ContentsService {
   }
 
   async findOne(id: number) {
+    const cacheKey = `content_${id}`;
+
+    const start = performance.now();
+
+    const cachedResult = await this.memcachedService.getCache(cacheKey);
+    if (cachedResult) {
+      const end = performance.now();
+      // console.log(`Database query took ${end - start} milliseconds`);
+      return cachedResult;
+    }
     const content = await this.contentRepository.findOne({
       where: { id: id },
       relations: { book: true },
     });
     if (!content)
       throw new NotFoundException(`Content with ID ${id} not found.`);
+    this.memcachedService.setCache(cacheKey, content);
     return content;
   }
 
@@ -151,14 +174,15 @@ export class ContentsService {
     const result = plainToInstance(ContentEntity, updatedContent, {
       excludeExtraneousValues: true,
     });
-
+    await this.memcachedService.flushCache();
     return result;
   }
   async remove(id: number) {
     const resultFind = await this.contentRepository.findOne({ where: { id } });
     if (!resultFind)
       throw new NotFoundException(`Content with ID ${id} not found`);
-    await this.contentRepository.delete(id);
-    return { content: resultFind, message: 'Content deleted successfully' };
+    await this.memcachedService.flushCache();
+    const resultDelate = await this.contentRepository.remove(resultFind);
+    return { content: resultDelate, message: 'Content deleted successfully' };
   }
 }

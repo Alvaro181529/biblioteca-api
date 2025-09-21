@@ -11,6 +11,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PaginacionService } from 'src/pagination/pagination.service';
 import { BookEntity } from 'src/books/entities/book.entity';
+import { MemcachedService } from 'src/memcached/memcached.service';
 
 @Injectable()
 export class InstrumentsService {
@@ -20,7 +21,8 @@ export class InstrumentsService {
     @InjectRepository(BookEntity)
     private readonly bookRepository: Repository<BookEntity>,
     private readonly paginacionService: PaginacionService,
-  ) {}
+    private readonly memcachedService: MemcachedService,
+  ) { }
   async create(
     createInstrumentDto: CreateInstrumentDto,
   ): Promise<InstrumentEntity> {
@@ -28,6 +30,7 @@ export class InstrumentsService {
     instrument.instrument_name = instrument.instrument_name.toLocaleUpperCase();
     instrument.instrument_family =
       instrument.instrument_family.toLocaleUpperCase();
+    await this.memcachedService.flushCache();
     return await this.instrumentRepository.save(instrument);
   }
 
@@ -36,6 +39,16 @@ export class InstrumentsService {
     pageSize: number = 10,
     name: string = '',
   ): Promise<any> {
+    const cacheKey = `instrument_list_${page}_${pageSize}_${name.toLowerCase().replace(/\s+/g, '_')}`;
+
+    const start = performance.now();
+
+    const cachedResult = await this.memcachedService.getCache(cacheKey);
+    if (cachedResult) {
+      const end = performance.now();
+      // console.log(`Database query took ${end - start} milliseconds`);
+      return cachedResult;
+    }
     const search = name.toLocaleLowerCase();
     const query = this.instrumentRepository.createQueryBuilder('instruments');
     if (search) {
@@ -53,7 +66,7 @@ export class InstrumentsService {
       pageSize,
       total,
     );
-
+    this.memcachedService.setCache(cacheKey, paginatedResult);
     return {
       data: paginatedResult.data,
       total: paginatedResult.total,
@@ -64,12 +77,23 @@ export class InstrumentsService {
   }
 
   async findOne(id: number) {
+    const cacheKey = `instrument_${id}`;
+
+    const start = performance.now();
+
+    const cachedResult = await this.memcachedService.getCache(cacheKey);
+    if (cachedResult) {
+      const end = performance.now();
+      // console.log(`Database query took ${end - start} milliseconds`);
+      return cachedResult;
+    }
     const instrument = await this.instrumentRepository.findOne({
       where: { id },
       select: { instrument_name: true, instrument_family: true },
     });
     if (!instrument)
       throw new NotFoundException(`Instrument with ID ${id} not found`);
+    this.memcachedService.setCache(cacheKey, instrument);
     return instrument;
   }
 
@@ -82,6 +106,7 @@ export class InstrumentsService {
     instrument.instrument_family =
       instrument.instrument_family.toLocaleUpperCase();
     try {
+      await this.memcachedService.flushCache();
       return await this.instrumentRepository.save(instrument);
     } catch (error) {
       throw new InternalServerErrorException(
@@ -105,6 +130,7 @@ export class InstrumentsService {
       );
     try {
       const info = await this.instrumentRepository.remove(instrument);
+      await this.memcachedService.flushCache();
       return { instrument: info, message: 'Instrument deleted successfully' };
     } catch (error) {
       throw new InternalServerErrorException(

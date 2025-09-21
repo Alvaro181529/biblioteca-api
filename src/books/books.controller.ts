@@ -27,7 +27,7 @@ import { CurrentUser } from 'src/users/utilities/decorators/current-user.decorat
 import { UserEntity } from 'src/users/entities/user.entity';
 @Controller('books')
 export class BooksController {
-  constructor(private readonly booksService: BooksService) {}
+  constructor(private readonly booksService: BooksService) { }
   @UseGuards(
     AuthenticationGuard,
     AuthorizeGuard([Roles.ADMIN, Roles.ROOT, Roles.DOCENTE]),
@@ -42,7 +42,7 @@ export class BooksController {
     return await this.booksService.create(createBookDto, files, currentUser);
   }
 
-  
+
 
   @Get()
   async findAll(
@@ -128,12 +128,15 @@ export class BooksController {
       }
     });
   }
-
-  @Get('/files/:id')
-  async findOneSound(@Param('id') id: string): Promise<BookEntity | {message:string}> {
-    return await this.booksService.findOneSound(+id);
-  }
-  @Get('document/:filename')
+  @UseGuards(
+    AuthenticationGuard)
+    @Get('/files/:id')
+    async findOneSound(@Param('id') id: string): Promise<BookEntity | { message: string }> {
+      return await this.booksService.findOneSound(+id);
+    }
+    @UseGuards(
+      AuthenticationGuard)
+    @Get('document/:filename')
   async getPdf(@Param('filename') filename: string, @Res() res: Response) {
     // Ruta absoluta para los archivos PDF
     const filePath = join(

@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ContentEntity } from './entities/content.entity';
 import { BookEntity } from 'src/books/entities/book.entity';
 import { PaginacionModule } from 'src/pagination/pagination.module';
+import { MemcachedService } from 'src/memcached/memcached.service';
 
 @Module({
   imports: [
@@ -12,7 +13,7 @@ import { PaginacionModule } from 'src/pagination/pagination.module';
     PaginacionModule,
   ],
   controllers: [ContentsController],
-  providers: [ContentsService],
+  providers: [ContentsService, MemcachedService],
   exports: [ContentsService],
 })
 export class ContentsModule {}

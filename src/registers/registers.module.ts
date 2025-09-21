@@ -6,6 +6,7 @@ import { RegisterEntity } from './entities/register.entity';
 import { InstrumentEntity } from 'src/instruments/entities/instrument.entity';
 import { CategoryEntity } from 'src/categories/entities/category.entity';
 import { BookEntity } from 'src/books/entities/book.entity';
+import { MemcachedService } from 'src/memcached/memcached.service';
 
 @Module({
   imports: [
@@ -17,7 +18,7 @@ import { BookEntity } from 'src/books/entities/book.entity';
     ]),
   ],
   controllers: [RegistersController],
-  providers: [RegistersService],
+  providers: [RegistersService, MemcachedService],
   exports: [RegistersService],
 })
 export class RegistersModule {}

@@ -20,6 +20,7 @@ import { BookEntity } from 'src/books/entities/book.entity';
 import { UpdatePasswordDto } from './dto/update-password';
 import { OrderEntity } from 'src/orders/entites/order.entity';
 import { OrderStatus } from 'src/orders/utilities/common/order-status.enum';
+import { MemcachedService } from 'src/memcached/memcached.service';
 
 @Injectable()
 export class UsersService {
@@ -33,7 +34,8 @@ export class UsersService {
     @InjectRepository(RegisterEntity)
     private registerRepository: Repository<RegisterEntity>,
     private readonly paginacionService: PaginacionService,
-  ) {}
+    private readonly memcachedService: MemcachedService,
+  ) { }
 
   async signup(userSignUpDto: UserSignUpDto): Promise<UserEntity> {
     const register = new RegisterEntity();
@@ -75,6 +77,7 @@ export class UsersService {
     user.register = newRegister;
     user = await this.usersRepository.save(user);
     delete user.password;
+    this.memcachedService.flushCache();
     return user;
   }
 
@@ -102,6 +105,16 @@ export class UsersService {
     query: string = '',
     type: string = 'true',
   ): Promise<any> {
+    const cacheKey = `users_findAll_${page}_${pageSize}_${query.toLowerCase().replace(/\s+/g, '_')}`;
+
+    const start = performance.now();
+
+    const cachedResult = await this.memcachedService.getCache(cacheKey);
+    if (cachedResult) {
+      const end = performance.now();
+      // console.log(`Database query took ${end - start} milliseconds`);
+      return cachedResult;
+    }
     const search = query ? query.toLowerCase() : '';
     const Query = this.usersRepository.createQueryBuilder('user');
     if (query) {
@@ -126,7 +139,7 @@ export class UsersService {
       pageSize,
       total,
     );
-
+    this.memcachedService.setCache(cacheKey, paginatedResult)
     return {
       data: paginatedResult.data,
       total: paginatedResult.total,
@@ -136,11 +149,26 @@ export class UsersService {
     };
   }
 
+
   async findOne(id: number): Promise<UserEntity> {
-    const user = this.usersRepository.findOneBy({ id });
+    const cacheKey = `user_id_${id}`;
+
+    const start = performance.now();
+
+    const cachedResult = await this.memcachedService.getCache(cacheKey);
+    if (cachedResult) {
+      const end = performance.now();
+      // console.log(`Database query took ${end - start} milliseconds`);
+      return cachedResult;
+    }
+
+    const user = await this.usersRepository.findOneBy({ id });
     if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    this.memcachedService.setCache(cacheKey, user);
     return user;
   }
+
 
   async update(id: number, updateUserDto: UpdateUserDto): Promise<UserEntity> {
     const user = await this.usersRepository.findOne({ where: { id } });
@@ -151,6 +179,7 @@ export class UsersService {
     user.rols = updateUserDto.rols;
     updateUserDto.name = updateUserDto.name.toLocaleUpperCase();
     Object.assign(user, updateUserDto);
+    this.memcachedService.flushCache();
     return await this.usersRepository.save(user);
   }
   async updatePassword(userId: number, updatePasswordDto: UpdatePasswordDto) {
@@ -173,7 +202,6 @@ export class UsersService {
     }
     user.password = await hash(newPassword, 10);
     await this.usersRepository.save(user);
-
     return { message: 'Contraseña actualizada exitosamente' };
   }
   async remove(id: number, userEntity: UserEntity) {
@@ -181,25 +209,35 @@ export class UsersService {
       where: { id },
       relations: { register: true, orders: true },
     });
+
     if (!user) throw new NotFoundException('Usuario no encontrado');
+
     const [orders, ordersCount] = await this.orderRepository.findAndCount({
       where: {
         user: { id: user.id },
         order_status: OrderStatus.PRESTADO,
       },
     });
+
     if (ordersCount > 0) {
       throw new BadRequestException({
         message: `No se puede eliminar la cuenta. El usuario tiene ${ordersCount} orden(es) asociada(s).`,
         orders: orders,
       });
     }
+
     if (userEntity.id == user.id)
-      throw new BadRequestException('No se puede elimar el usuario actual');
+      throw new BadRequestException('No se puede eliminar el usuario actual');
+
     await this.orderRepository.remove(user.orders);
     await this.usersRepository.delete(id);
     await this.registerRepository.remove(user.register);
-    return { user, status: 'User delated' };
+
+    // Eliminar el caché del usuario
+    this.memcachedService.flushCache();
+
+
+    return { user, status: 'Usuario eliminado' };
   }
   async activate(id: number, userEntity: UserEntity) {
     if (
@@ -217,6 +255,7 @@ export class UsersService {
     if (!user) throw new BadRequestException('Usuario no encontrado');
     user.active = true;
     try {
+      this.memcachedService.flushCache();
       return this.usersRepository.save(user);
     } catch (error) {
       throw new InternalServerErrorException('Hubo un error: ', error);
@@ -243,6 +282,7 @@ export class UsersService {
     if (!user) throw new BadRequestException('Usuario no encontrado');
     user.active = false;
     try {
+      this.memcachedService.flushCache();
       return this.usersRepository.save(user);
     } catch (error) {
       throw new InternalServerErrorException('Hubo un error: ', error);
@@ -268,15 +308,31 @@ export class UsersService {
 
     await this.usersRepository.delete(id);
     await this.registerRepository.remove(user.register);
+    this.memcachedService.flushCache();
     return { user, status: 'Userio eliminado' };
   }
   async me(userEntity: UserEntity) {
     if (!userEntity || !userEntity.id)
-      throw new BadRequestException('Por favor iniciar session');
+      throw new BadRequestException('Por favor inicie sesión');
+
+    const cacheKey = `user_me_${userEntity.id}`;
+
+    const start = performance.now();
+
+    const cachedResult = await this.memcachedService.getCache(cacheKey);
+    if (cachedResult) {
+      const end = performance.now();
+      // console.log(`Database query took ${end - start} milliseconds`);
+      return cachedResult;
+    }
+
     const user = await this.usersRepository.findOne({
       where: { id: userEntity.id },
       relations: { register: true },
     });
+
+    // Guardamos en caché los detalles de 'me'
+    this.memcachedService.setCache(cacheKey, user);
     return user;
   }
   async findUserByEmail(email: string) {

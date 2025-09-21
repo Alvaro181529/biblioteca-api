@@ -209,6 +209,7 @@ export class BooksService {
     this.filesUpload(book, createBookDto, files);
     book.addedBy = currentUser;
     try {
+      await this.memcachedService.flushCache();
       return await this.bookRepository.save(book);
     } catch (error) {
       throw new BadRequestException('Error en el guardado' + error);
@@ -561,6 +562,7 @@ export class BooksService {
     if (updateBookDto.book_authors?.length) book.book_authors = authors;
 
     try {
+      await this.memcachedService.flushCache();
       return await this.bookRepository.save(book);
     } catch (error) {
       throw new InternalServerErrorException(
@@ -626,6 +628,7 @@ export class BooksService {
     try {
       this.deleteFileIfExists(book.book_document, 'document');
       this.deleteFileIfExists(book.book_imagen, 'image');
+      await this.memcachedService.flushCache();
       const data = await this.bookRepository.remove(book);
       return { book: data, message: 'Book deleted successfully' };
     } catch (error) {

@@ -64,7 +64,7 @@ export class PublicationsController {
     );
     return res.sendFile(filePath, (err) => {
       if (err) {
-        throw new BadRequestException('Error sending file:' + err);
+        // throw new NotFoundException('Error sending file:' + err);
         return res
           .status(404)
           .json({ statusCode: 404, message: 'Image not found' });
