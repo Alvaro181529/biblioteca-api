@@ -289,7 +289,7 @@ export class BooksService {
     const cachedResult = await this.memcachedService.getCache(cacheKey);
     if (cachedResult) {
       const end = performance.now();
-      console.log(`Database query took ${end - start} milliseconds`);
+      // console.log(`Database query took ${end - start} milliseconds`);
       return cachedResult;
     }
     if (searchTerm) {
@@ -369,12 +369,12 @@ export class BooksService {
       total,
     );
     const end = performance.now();
-    console.log(`Database query took ${end - start} milliseconds`);
+    // console.log(`Database query took ${end - start} milliseconds`);
     if (searchTerm) {
       const start = performance.now();
       booksFilters = await prioritizeBooksACO(searchTerm, paginatedResult.data);
       const end = performance.now();
-      console.log(`Database query took ${end - start} milliseconds`);
+      // console.log(`Database query took ${end - start} milliseconds`);
     }
     this.memcachedService.setCache(cacheKey, paginatedResult);
     return {
@@ -402,7 +402,7 @@ export class BooksService {
     const cachedResult = await this.memcachedService.getCache(cacheKey);
     if (cachedResult) {
       const end = performance.now();
-      console.log(`Database query took ${end - start} milliseconds`);
+      // console.log(`Database query took ${end - start} milliseconds`);
       return cachedResult;
     }
     const query = this.bookRepository.createQueryBuilder('book');

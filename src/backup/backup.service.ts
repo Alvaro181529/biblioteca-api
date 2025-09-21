@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
+import { promisify } from 'util';
 
 @Injectable()
 export class BackupService {
@@ -24,16 +25,20 @@ export class BackupService {
 
     // Preparar argumentos de pg_dump
     const args = [
-      '-h', this.dbHost,
-      '-p', this.dbPort,
-      '-U', this.dbUser,
-      '-F', 'c',
+      '-h',
+      this.dbHost,
+      '-p',
+      this.dbPort,
+      '-U',
+      this.dbUser,
+      '-F',
+      'c',
       '-b',
       '-v',
-      '-f', backupFilePath,
+      '-f',
+      backupFilePath,
       this.dbName,
     ];
-
 
     return new Promise<string>((resolve, reject) => {
       const child = spawn('pg_dump', args, {
@@ -56,5 +61,36 @@ export class BackupService {
         }
       });
     });
+  }
+  async ListBackupFiles(): Promise<{ fileName: string, date: string }[]> {
+    const bdDir = path.join(process.cwd(), 'db/backups');
+    try {
+      const files = await promisify(fs.readdir)(bdDir);
+
+      // Filtra los archivos .bak y extrae la fecha de cada archivo
+      return files
+        .filter((file: any) => file.endsWith('.bak')) // Filtra solo los archivos .bak
+        .map((file: any) => {
+          const dateStringMatch = file.match(/_(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z)/);
+          if (dateStringMatch) {
+            const fileDate = dateStringMatch[1];
+            return { fileName: file, date: fileDate };
+          }
+          return { fileName: file, date: 'Fecha no disponible' }; // En caso de no poder extraer la fecha
+        });
+    } catch (err) {
+      console.error('Error al listar los archivos de respaldo:', err);
+      throw new Error('No se pudieron listar los archivos de respaldo');
+    }
+  }
+  async DownloadBackupFile(fileName: string): Promise<Buffer> {
+    const bdDir = path.join(process.cwd(), 'db/backups');
+    const filePath = path.join(bdDir, fileName);
+
+    if (fs.existsSync(filePath)) {
+      return fs.promises.readFile(filePath);  // Devuelve el archivo como Buffer
+    } else {
+      throw new Error('El archivo no existe');
+    }
   }
 }
