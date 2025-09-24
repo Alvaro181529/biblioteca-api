@@ -117,15 +117,9 @@ export class MemcachedService {
 
   // Almacenar un valor en Memcached
   setCache(key: string, value: any, ttl: number = 3600): void {
-    if (!this.isMemcachedEnabled) {
-      console.log('Memcached está deshabilitado. No se almacenará en la caché.');
-      return;
-    }
-
-    if (!this.memcachedClient) {
+    if (!this.isMemcachedEnabled) return;
+    if (!this.memcachedClient)
       throw new BadRequestException('Memcached no está inicializado correctamente');
-      return;
-    }
 
     this.memcachedClient.set(key, value, ttl, (err) => {
       if (err) {
@@ -138,14 +132,12 @@ export class MemcachedService {
   getCache(key: string): Promise<any> {
     return new Promise((resolve, reject) => {
       if (!this.isMemcachedEnabled) {
-        console.log('Memcached está deshabilitado. No se puede obtener de la caché.');
         resolve(null); // Puedes devolver null o algún valor predeterminado
         return;
       }
 
-      if (!this.memcachedClient) {
-        reject('Memcached no está inicializado correctamente');
-      }
+      if (!this.memcachedClient) reject('Memcached no está inicializado correctamente');
+
 
       this.memcachedClient.get(key, (err: any, data: any) => {
         if (err) {
@@ -159,15 +151,11 @@ export class MemcachedService {
 
   // Eliminar un valor de Memcached
   deleteCache(key: string): void {
-    if (!this.isMemcachedEnabled) {
-      console.log('Memcached está deshabilitado. No se eliminará de la caché.');
-      return;
-    }
+    if (!this.isMemcachedEnabled) return;
 
-    if (!this.memcachedClient) {
+    if (!this.memcachedClient)
       throw new BadRequestException('Memcached no está inicializado correctamente');
-      return;
-    }
+
 
     this.memcachedClient.del(key, (err) => {
       if (err) {
@@ -178,10 +166,7 @@ export class MemcachedService {
 
   // Limpiar toda la caché
   flushCache(): void {
-    if (!this.isMemcachedEnabled) {
-      console.log('Memcached está deshabilitado. No se limpiará la caché.');
-      return;
-    }
+    if (!this.isMemcachedEnabled) return;
 
     if (!this.memcachedClient) {
       throw new BadRequestException('Memcached no está inicializado correctamente');

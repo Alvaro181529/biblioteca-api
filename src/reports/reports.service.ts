@@ -174,13 +174,14 @@ export class ReportsService {
     const booksConditionAndTypeCount = await this.analyticsService.getBooksConditionAndTypeCount();
     const popularBooks = await this.analyticsService.getBooksCountPopular();
     const borrowedBooks = await this.analyticsService.getBooksBorrowed();
-
+    const borrowedBooksMonthy = await this.analyticsService.getMonthlyBorrowStats();
     const docDefinition = ReportAnalytics({
       booksCount,
       booksValueByType,
       booksConditionAndTypeCount,
       popularBooks,
       borrowedBooks,
+      borrowedBooksMonthy,
     });
     return this.printer.createPdf(docDefinition)
   }

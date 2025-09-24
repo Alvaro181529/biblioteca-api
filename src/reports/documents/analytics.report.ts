@@ -4,11 +4,14 @@ import { TDocumentDefinitions } from 'pdfmake/interfaces';
 interface ReportData {
   booksCount: number;
   booksValueByType: Record<string, number>;
-  booksConditionAndTypeCount: Record<string, { book_condition: string; count: number }[]>;
+  booksConditionAndTypeCount: Record<
+    string,
+    { book_condition: string; count: number }[]
+  >;
   popularBooks: { book_title_original: string; book_loan: number }[];
   borrowedBooks: any[];
+  borrowedBooksMonthy: any[];
 }
-
 
 // Asegúrate de que la función reciba un objeto `data` de tipo `ReportData`
 export const ReportAnalytics = (data: ReportData): TDocumentDefinitions => {
@@ -16,10 +19,11 @@ export const ReportAnalytics = (data: ReportData): TDocumentDefinitions => {
     defaultStyle: { fontSize: 10 },
     pageSize: 'A4',
     pageMargins: [40, 60, 40, 60],
-    header: [{
-      text: 'Reporte de Estadísticas - Biblioteca CPM',
-      style: 'header',
-    },
+    header: [
+      {
+        text: 'Reporte de Estadísticas - Biblioteca CPM',
+        style: 'header',
+      },
     ],
     content: [
       //fecha
@@ -36,9 +40,7 @@ export const ReportAnalytics = (data: ReportData): TDocumentDefinitions => {
       {
         table: {
           widths: ['*', '*'],
-          body: [
-            ['Total de Contenido', data.booksCount.toString() ],
-          ],
+          body: [['Total de Contenido', data.booksCount.toString()]],
         },
         style: 'body',
       },
@@ -48,22 +50,18 @@ export const ReportAnalytics = (data: ReportData): TDocumentDefinitions => {
         text: 'Cantidad de Libros por Condición y Tipo',
         style: 'subheader',
       },
-      // ...Object.keys(data.booksConditionAndTypeCount).map((type) => ({
-      //   text: `${type} (${data.booksConditionAndTypeCount[type].length} condiciones)`,
-      //   style: 'subheader',
-      // })),
-
       {
         table: {
           widths: ['*', 'auto', 'auto'],
           body: [
             ['Condición', 'Cantidad', 'Tipo de Libro'],
-            ...Object.entries(data.booksConditionAndTypeCount).flatMap(([type, conditions]) =>
-              conditions.map((condition) => [
-                condition.book_condition,
-                condition.count,
-                type,
-              ])
+            ...Object.entries(data.booksConditionAndTypeCount).flatMap(
+              ([type, conditions]) =>
+                conditions.map((condition) => [
+                  condition.book_condition,
+                  condition.count,
+                  type,
+                ]),
             ),
           ],
         },
@@ -72,7 +70,7 @@ export const ReportAnalytics = (data: ReportData): TDocumentDefinitions => {
 
       // Libros más Populares
       {
-        text: 'Libros Más Populares',
+        text: 'Libros más Populares',
         style: 'subheader',
       },
       {
@@ -97,12 +95,43 @@ export const ReportAnalytics = (data: ReportData): TDocumentDefinitions => {
         table: {
           widths: ['*', '*'],
           body: [
-            ...Object.entries(data.booksValueByType).map(([key, value]) => [key, `$ ${value.toFixed(2)}`]),
+            ...Object.entries(data.booksValueByType).map(([key, value]) => [
+              key,
+              `Bs ${value.toFixed(2)}`,
+            ]),
           ],
         },
         style: 'body',
       },
-
+      // Libros prestamos al mes
+      {
+        text: 'Libros por mes',
+        style: 'subheader',
+        pageBreak: 'before',
+      },
+      {
+        table: {
+          widths: ['*', '*'],
+          body: [
+            ['Fecha', 'Cantidad de Préstamos'],
+            ...data.borrowedBooksMonthy
+              .sort(
+                (a, b) =>
+                  new Date(b.month).getTime() - new Date(a.month).getTime(),
+              )
+              .map((order) => [
+                order.month
+                  ? new Date(order.month).toLocaleDateString('es-ES', {
+                    year: 'numeric',
+                    month: 'long',
+                  })
+                  : 'S/F',
+                order.count || 'Sin datos',
+              ]),
+          ],
+        },
+        style: 'body',
+      },
       // Libros Prestados
       {
         text: 'Libros Prestados',
@@ -117,7 +146,9 @@ export const ReportAnalytics = (data: ReportData): TDocumentDefinitions => {
               order.books[0].book_title_original,
               order.order_status,
               new Date(order.order_at).toLocaleDateString(),
-              order.order_regresado_at ? new Date(order.order_regresado_at).toLocaleDateString() : 'Pendiente',
+              order.order_regresado_at
+                ? new Date(order.order_regresado_at).toLocaleDateString()
+                : 'Pendiente',
             ]),
           ],
         },
@@ -164,6 +195,6 @@ export const ReportAnalytics = (data: ReportData): TDocumentDefinitions => {
         alignment: 'center',
         margin: [0, 10],
       },
-    }
+    },
   };
 };
