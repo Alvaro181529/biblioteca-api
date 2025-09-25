@@ -22,6 +22,7 @@ import { AuthenticationGuard } from 'src/users/utilities/guards/authentication.g
 import { AuthorizeGuard } from 'src/users/utilities/guards/authorization.guards';
 import { Roles } from 'src/users/utilities/common/user-role.enum';
 import { join } from 'path';
+import * as fs from 'fs';
 import { Response } from 'express';
 import { CurrentUser } from 'src/users/utilities/decorators/current-user.decorator';
 import { UserEntity } from 'src/users/entities/user.entity';
@@ -108,35 +109,69 @@ export class BooksController {
       currentUser,
     );
   }
+  // @Get('image/:filename')
+  // async getImage(@Param('filename') filename: string, @Res() res: Response) {
+  //   // Ruta absoluta para las imágenes
+  //   const filePath = join(
+  //     __dirname,
+  //     '..',
+  //     '..',
+  //     '..',
+  //     'uploads',
+  //     'image',
+  //     filename,
+  //   );
+  //   return res.sendFile(filePath, (err) => {
+  //     if (err) {
+  //       return res
+  //         .status(404)
+  //         .json({ statusCode: 404, message: 'Image not found' });
+  //     }
+  //   });
+  // }
   @Get('image/:filename')
   async getImage(@Param('filename') filename: string, @Res() res: Response) {
-    // Ruta absoluta para las imágenes
-    const filePath = join(
-      __dirname,
-      '..',
-      '..',
-      '..',
-      'uploads',
-      'image',
-      filename,
-    );
-    return res.sendFile(filePath, (err) => {
-      if (err) {
-        return res
-          .status(404)
-          .json({ statusCode: 404, message: 'Image not found' });
+    const basePath = join(__dirname, '..', '..', '..', 'uploads', 'image');
+    const originalPath = join(basePath, filename);
+
+    // Si el archivo original existe, lo enviamos
+    if (fs.existsSync(originalPath)) {
+      return res.sendFile(originalPath);
+    }
+    // Si no existe, verificamos si es un archivo LIB
+    const isLib = filename.includes('LIB');
+    if (isLib) {
+      const numberMatch = filename.match(/_(\d+)(?:[-_.]|$)/); // Extrae el número
+      if (!numberMatch) {
+        return res.status(404).json({ statusCode: 404, message: 'Image not found' });
       }
-    });
+
+      const number = numberMatch[1].replace(/^0+/, ''); // Elimina ceros a la izquierda
+      // Buscar archivos en el directorio que terminen en ese número (sin ceros a la izquierda)
+      const files = fs.readdirSync(basePath);
+      const matchedFile = files.find((file: any) => {
+        const match = file.match(/^(\d+)\.(jpg|jpeg|png|webp)$/i);
+        if (!match) return false;
+
+        const fileNumber = match[1].replace(/^0+/, '');
+        return fileNumber === number;
+      });
+      if (matchedFile) {
+        const fallbackPath = join(basePath, matchedFile);
+        return res.sendFile(fallbackPath);
+      }
+    }
+    return res.status(404).json({ statusCode: 404, message: 'Image not found' });
   }
   @UseGuards(
     AuthenticationGuard)
-    @Get('/files/:id')
-    async findOneSound(@Param('id') id: string): Promise<BookEntity | { message: string }> {
-      return await this.booksService.findOneSound(+id);
-    }
-    @UseGuards(
-      AuthenticationGuard)
-    @Get('document/:filename')
+  @Get('/files/:id')
+  async findOneSound(@Param('id') id: string): Promise<BookEntity | { message: string }> {
+    return await this.booksService.findOneSound(+id);
+  }
+  @UseGuards(
+    AuthenticationGuard)
+  @Get('document/:filename')
   async getPdf(@Param('filename') filename: string, @Res() res: Response) {
     // Ruta absoluta para los archivos PDF
     const filePath = join(
