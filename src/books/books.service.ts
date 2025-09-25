@@ -138,9 +138,17 @@ export class BooksService {
     }
   }
 
-  extractNumberFromInventory(inventory: string): number | null {
-    const match = inventory.match(/\d+/);
-    return match ? parseInt(match[0], 10) : null;
+  extractNumberFromInventory(inventory: string, type: string): number | null {
+    if (!inventory || !type) return null;
+    const normalizedType = type.toUpperCase();
+    const normalizedInventory = inventory.toUpperCase();
+
+    if (normalizedInventory.startsWith(normalizedType)) {
+      const match = normalizedInventory.match(/\d+/);
+      return match ? parseInt(match[0], 10) : null;
+    }
+
+    return null; // Si no coincide, devolvemos null
   }
   async countInventory(
     book: BookEntity,
@@ -152,7 +160,10 @@ export class BooksService {
     });
     const bookType = createBookDto.book_type.toLocaleUpperCase();
     const numberAsInteger: number = lastBook
-      ? this.extractNumberFromInventory(lastBook.book_inventory) || 1
+      ? this.extractNumberFromInventory(
+        lastBook.book_inventory,
+        lastBook.book_type,
+      ) || 1
       : 0;
     const booksCount = Number(numberAsInteger);
     const formattedCount = (booksCount + 1).toString().padStart(8, '0');
@@ -299,6 +310,8 @@ export class BooksService {
           book.book_headers ILIKE :searchTerm
           OR similarity(unaccent_immutable(book.book_title_parallel), unaccent_immutable(:searchTerm)) > 0.2
           OR similarity(unaccent_immutable(book.book_title_original), unaccent_immutable(:searchTerm)) > 0.3
+          OR similarity(unaccent_immutable(book.book_inventory), unaccent_immutable(:searchTerm)) > 0.8
+          OR similarity(unaccent_immutable(book.book_location), unaccent_immutable(:searchTerm)) > 0.8
         )`,
         { searchTerm: `%${searchTerm.toLowerCase()}%` },
       );
