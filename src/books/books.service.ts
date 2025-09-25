@@ -294,11 +294,15 @@ export class BooksService {
     const query = this.bookRepository.createQueryBuilder('book');
 
     let booksFilters: BookEntity[] | null = null;
-
+    let cachedResult: any;
     const cacheKey = `books_${page}_${pageSize}_${searchTerm.toLowerCase().replace(/\s+/g, '_')}_${searchType}_${searchCategories.join(',')}_${searchAuthors.join(',')}_${searchInstruments.join(',')}`;
-
-
-    const cachedResult = await this.memcachedService.getCache(cacheKey);
+    if (
+      !searchAuthors.length && !searchInstruments.length && !searchCategories.length
+    ) {
+      cachedResult = await this.memcachedService.getCache(cacheKey);
+    } else {
+      cachedResult = null;
+    }
     if (cachedResult) {
       const end = performance.now();
       // console.log(`Database query took ${end - start} milliseconds`);
@@ -390,7 +394,10 @@ export class BooksService {
       const end = performance.now();
       // console.log(`Database query took ${end - start} milliseconds`);
     }
-    this.memcachedService.setCache(cacheKey, paginatedResult);
+    if (
+      !searchAuthors.length && !searchInstruments.length && !searchCategories.length
+    )
+      this.memcachedService.setCache(cacheKey, paginatedResult);
     return {
       data: booksFilters ? booksFilters : paginatedResult.data,
       total: paginatedResult.total,
@@ -534,24 +541,28 @@ export class BooksService {
   }
   async findOneSound(id: number): Promise<BookEntity | { message: string }> {
     if (process.env.EXPORTS_CONVERT === 'true') {
-      const book = await this.bookRepository.findOne({ where: { id: Number(id) } });
-      if (!book) throw new NotFoundException(`Book with ID ${id} not found`);
-      const NombreDocumento = book.book_document;
-      const CodigoInventario = book.book_inventory;
-      let data: any
-      if (CodigoInventario && NombreDocumento) {
-        data = await ExportImport(CodigoInventario, NombreDocumento);
+      try {
+
+        const book = await this.bookRepository.findOne({ where: { id: Number(id) } });
+        if (!book) throw new NotFoundException(`Book with ID ${id} not found`);
+        const NombreDocumento = book.book_document;
+        const CodigoInventario = book.book_inventory;
+        let data: any
+        if (CodigoInventario && NombreDocumento) {
+          data = await ExportImport(CodigoInventario, NombreDocumento);
+        }
+        data = {
+          midi_url: process.env.EXPORTS_CONVERT_URL + data.midi_url,
+          mxl_url: process.env.EXPORTS_CONVERT_URL + data.mxl_url
+        }
+        return data;
+      } catch (error) {
+        throw new NotFoundException(`fail convercion` + error);
       }
-      data = {
-        midi_url: process.env.EXPORTS_CONVERT_URL + data.midi_url,
-        mxl_url: process.env.EXPORTS_CONVERT_URL + data.mxl_url
-      }
-      return data;
     } else {
-      return { message: "File conversion is not enabled." };
+      throw new NotFoundException(`fail convercion`);
     }
   }
-
 
   async update(
     id: number,
