@@ -22,19 +22,28 @@ import { AuthenticationGuard } from 'src/users/utilities/guards/authentication.g
 import { AuthorizeGuard } from 'src/users/utilities/guards/authorization.guards';
 import { Roles } from 'src/users/utilities/common/user-role.enum';
 import { join } from 'path';
+import * as fs from 'fs';
 import { Response } from 'express';
+import { CurrentUser } from 'src/users/utilities/decorators/current-user.decorator';
+import { UserEntity } from 'src/users/entities/user.entity';
 @Controller('books')
 export class BooksController {
-  constructor(private readonly booksService: BooksService) {}
-  @UseGuards(AuthenticationGuard, AuthorizeGuard([Roles.ADMIN, Roles.ROOT]))
+  constructor(private readonly booksService: BooksService) { }
+  @UseGuards(
+    AuthenticationGuard,
+    AuthorizeGuard([Roles.ADMIN, Roles.ROOT, Roles.DOCENTE]),
+  )
   @Post()
   @UseInterceptors(FilesInterceptor('files', 2, multerOptions))
   async create(
     @Body() createBookDto: CreateBookDto,
     @UploadedFiles() files: Array<Express.Multer.File>,
+    @CurrentUser() currentUser: UserEntity,
   ): Promise<BookEntity> {
-    return await this.booksService.create(createBookDto, files);
+    return await this.booksService.create(createBookDto, files, currentUser);
   }
+
+
 
   @Get()
   async findAll(
@@ -65,28 +74,103 @@ export class BooksController {
       searchInstrumentsArray,
     );
   }
+  @UseGuards(
+    AuthenticationGuard,
+    AuthorizeGuard([Roles.DOCENTE]),
+  )
+  @Get('mybooks')
+  async findMyBooks(
+    @Query('query') query: string = '',
+    @Query('type') type: string = '',
+    @Query('page') page: string = '1',
+    @Query('pageSize') pageSize: string = '10',
+    @Query('searchCategories') searchCategories: string = '',
+    @Query('searchAuthors') searchAuthors: string = '',
+    @Query('searchInstruments') searchInstruments: string = '',
+    @CurrentUser() currentUser: UserEntity,
+  ): Promise<any> {
+    const pageNumber = parseInt(page, 10);
+    const pageSizeNumber = parseInt(pageSize, 10);
+    const searchCategoriesArray = searchCategories
+      ? searchCategories.split(',')
+      : [];
+    const searchAuthorsArray = searchAuthors ? searchAuthors.split(',') : [];
+    const searchInstrumentsArray = searchInstruments
+      ? searchInstruments.split(',')
+      : [];
+    return await this.booksService.findMyBooks(
+      pageNumber,
+      pageSizeNumber,
+      query,
+      type,
+      searchCategoriesArray,
+      searchAuthorsArray,
+      searchInstrumentsArray,
+      currentUser,
+    );
+  }
+  // @Get('image/:filename')
+  // async getImage(@Param('filename') filename: string, @Res() res: Response) {
+  //   // Ruta absoluta para las imágenes
+  //   const filePath = join(
+  //     __dirname,
+  //     '..',
+  //     '..',
+  //     '..',
+  //     'uploads',
+  //     'image',
+  //     filename,
+  //   );
+  //   return res.sendFile(filePath, (err) => {
+  //     if (err) {
+  //       return res
+  //         .status(404)
+  //         .json({ statusCode: 404, message: 'Image not found' });
+  //     }
+  //   });
+  // }
   @Get('image/:filename')
   async getImage(@Param('filename') filename: string, @Res() res: Response) {
-    // Ruta absoluta para las imágenes
-    const filePath = join(
-      __dirname,
-      '..',
-      '..',
-      '..',
-      'uploads',
-      'image',
-      filename,
-    );
-    return res.sendFile(filePath, (err) => {
-      if (err) {
-        console.error('Error sending file:', err);
-        return res
-          .status(404)
-          .json({ statusCode: 404, message: 'Image not found' });
-      }
-    });
-  }
+    const basePath = join(__dirname, '..', '..', '..', 'uploads', 'image');
+    const originalPath = join(basePath, filename);
 
+    // Si el archivo original existe, lo enviamos
+    if (fs.existsSync(originalPath)) {
+      return res.sendFile(originalPath);
+    }
+    // Si no existe, verificamos si es un archivo LIB
+    const isLib = filename.includes('LIB');
+    if (isLib) {
+      const numberMatch = filename.match(/_(\d+)(?:[-_.]|$)/); // Extrae el número
+      if (!numberMatch) {
+        return res.status(404).json({ statusCode: 404, message: 'Image not found' });
+      }
+
+      const number = numberMatch[1].replace(/^0+/, ''); // Elimina ceros a la izquierda
+      // Buscar archivos en el directorio que terminen en ese número (sin ceros a la izquierda)
+      const files = fs.readdirSync(basePath);
+      const matchedFile = files.find((file: any) => {
+        const match = file.match(/^(\d+)\.(jpg|jpeg|png|webp)$/i);
+        if (!match) return false;
+
+        const fileNumber = match[1].replace(/^0+/, '');
+        return fileNumber === number;
+      });
+      if (matchedFile) {
+        const fallbackPath = join(basePath, matchedFile);
+        return res.sendFile(fallbackPath);
+      }
+    }
+    return res.status(404).json({ statusCode: 404, message: 'Image not found' });
+  }
+  @UseGuards(
+    AuthenticationGuard)
+  @Get('/files/:id')
+  async findOneSound(@Param('id') id: string): Promise<BookEntity | { message: string }> {
+    return await this.booksService.findOneSound(+id);
+  }
+  @UseGuards(
+    AuthenticationGuard)
   @Get('document/:filename')
   async getPdf(@Param('filename') filename: string, @Res() res: Response) {
     // Ruta absoluta para los archivos PDF
@@ -101,7 +185,6 @@ export class BooksController {
     );
     return res.sendFile(filePath, (err) => {
       if (err) {
-        console.error('Error sending file:', err);
         return res
           .status(404)
           .json({ statusCode: 404, message: 'File not found' });
@@ -126,8 +209,14 @@ export class BooksController {
     @Param('id') id: string,
     @Body() updateBookDto: UpdateBookDto,
     @UploadedFiles() files: Array<Express.Multer.File>,
+    @CurrentUser() currentUser: UserEntity,
   ): Promise<BookEntity> {
-    return await this.booksService.update(+id, updateBookDto, files);
+    return await this.booksService.update(
+      +id,
+      updateBookDto,
+      files,
+      currentUser,
+    );
   }
   @UseGuards(AuthenticationGuard, AuthorizeGuard([Roles.ADMIN, Roles.ROOT]))
   @Patch(':id/deactivate')

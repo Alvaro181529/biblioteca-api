@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthorEntity } from './entities/author.entity';
 import { PaginacionModule } from 'src/pagination/pagination.module';
 import { BookEntity } from 'src/books/entities/book.entity';
+import { MemcachedService } from 'src/memcached/memcached.service';
 
 @Module({
   imports: [
@@ -12,7 +13,7 @@ import { BookEntity } from 'src/books/entities/book.entity';
     PaginacionModule,
   ],
   controllers: [AuthorsController],
-  providers: [AuthorsService],
+  providers: [AuthorsService, MemcachedService],
   exports: [AuthorsService],
 })
-export class AuthorsModule {}
+export class AuthorsModule { }

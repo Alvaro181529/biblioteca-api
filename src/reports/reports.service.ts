@@ -3,9 +3,11 @@ import { PrinterService } from 'src/printer/printer.service';
 import { Reports } from './documents/document.report';
 import { InjectRepository } from '@nestjs/typeorm';
 import { BookEntity } from 'src/books/entities/book.entity';
-import { Repository } from 'typeorm';
+import { Between, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { OrderEntity } from 'src/orders/entites/order.entity';
+import { AnalyticsService } from 'src/analytics/analytics.service';
+import { ReportAnalytics } from './documents/analytics.report';
 
 @Injectable()
 export class ReportsService {
@@ -17,9 +19,22 @@ export class ReportsService {
     private readonly userRepository: Repository<UserEntity>,
     @InjectRepository(OrderEntity)
     private readonly orderRepository: Repository<OrderEntity>,
-  ) {}
-  async getBooksReport(): Promise<PDFKit.PDFDocument> {
+    private readonly analyticsService: AnalyticsService,
+  ) { }
+  async getBooksReport(
+    startDate?: string,
+    endDate?: string,
+  ): Promise<PDFKit.PDFDocument> {
+    const where: any = {};
+    if (startDate != 'null' && endDate != 'null') {
+      where.book_create_at = Between(startDate, endDate);
+    } else if (startDate != 'null') {
+      where.book_create_at = MoreThanOrEqual(startDate);
+    } else if (endDate != 'null') {
+      where.book_create_at = LessThanOrEqual(endDate);
+    }
     const data = await this.bookRepository.find({
+      where,
       relations: { book_authors: true },
       order: {
         book_type: 'ASC',
@@ -44,21 +59,21 @@ export class ReportsService {
       { text: book.book_title_original || 'Sin Título', margin: [0, 8] },
       book.book_authors && book.book_authors.length > 0
         ? {
-            ul: book.book_authors.map((author) => author.author_name),
-            margin: [0, 4],
-          }
+          ul: book.book_authors.map((author) => author.author_name),
+          margin: [0, 4],
+        }
         : { text: 'N/A', margin: [0, 8] },
       { text: book.book_condition, margin: [0, 8] },
       {
         text:
           book.book_price_type && book.book_original_price
             ? `(${book.book_price_type.replace(/\s+/g, '')}) ${Intl.NumberFormat(
-                'en-US',
-                {
-                  style: 'currency',
-                  currency: 'USD',
-                },
-              ).format(book.book_original_price)}`
+              'en-US',
+              {
+                style: 'currency',
+                currency: 'USD',
+              },
+            ).format(book.book_original_price)}`
             : 'Desconocida',
         bold: true,
         alignment: 'right',
@@ -123,26 +138,24 @@ export class ReportsService {
       { text: 'NOMBRE', bold: true },
       { text: 'CORREO', bold: true },
       { text: 'ESTADO', bold: true },
-      { text: 'FECHA', bold: true },
       { text: 'LIBROS', bold: true },
     ];
-    const widths = ['auto', '*', 'auto', 'auto', 'auto', '*'];
+    const widths = ['auto', '*', 'auto', 'auto', '*'];
     const mapFn = (order: OrderEntity, index: number) => [
       { text: index + 1, margin: [0, 5] },
       { text: order.user.name, margin: [0, 5] },
       { text: order.user.email, margin: [0, 5] },
-      { text: order.order_status, margin: [0, 5] },
       {
         text: order.order_regresado_at
-          ? new Date(order.order_regresado_at).toLocaleDateString('es-ES')
+          ? `${order.order_status} EN  ${new Date(order.order_regresado_at).toLocaleDateString('es-ES')}`
           : 'Sin Regresar',
         margin: [0, 5],
       },
       order.books
         ? {
-            text: order.books.map((book) => book.book_title_original),
-            margin: [0, 4],
-          }
+          text: order.books.map((book) => book.book_title_original),
+          margin: [0, 4],
+        }
         : { text: 'N/A', margin: [0, 8] },
     ];
     const docDefinition = Reports(
@@ -153,5 +166,23 @@ export class ReportsService {
       mapFn,
     );
     return this.printer.createPdf(docDefinition);
+  }
+
+  async getAnalyticsReport() {
+    const booksCount = await this.analyticsService.getBooksCount();
+    const booksValueByType = await this.analyticsService.getBooksValueByType();
+    const booksConditionAndTypeCount = await this.analyticsService.getBooksConditionAndTypeCount();
+    const popularBooks = await this.analyticsService.getBooksCountPopular();
+    const borrowedBooks = await this.analyticsService.getBooksBorrowed();
+    const borrowedBooksMonthy = await this.analyticsService.getMonthlyBorrowStats();
+    const docDefinition = ReportAnalytics({
+      booksCount,
+      booksValueByType,
+      booksConditionAndTypeCount,
+      popularBooks,
+      borrowedBooks,
+      borrowedBooksMonthy,
+    });
+    return this.printer.createPdf(docDefinition)
   }
 }

@@ -27,7 +27,7 @@ export class RegisterEntity {
   @Column({ nullable: true })
   register_ubication: string;
 
-  @ManyToMany(() => CategoryEntity, { eager: true })
+  @ManyToMany(() => CategoryEntity, { eager: true, nullable:true })
   @JoinTable({
     name: 'category_register',
     joinColumn: { name: 'register_id', referencedColumnName: 'id' },
@@ -35,14 +35,14 @@ export class RegisterEntity {
   })
   register_category: CategoryEntity[];
 
-  @ManyToMany(() => InstrumentEntity, { eager: true })
+  @ManyToMany(() => InstrumentEntity, { eager: true, nullable:true })
   @JoinTable({
     name: 'instument_register',
     joinColumn: { name: 'register_id', referencedColumnName: 'id' },
     inverseJoinColumn: { name: 'instrument_id', referencedColumnName: 'id' },
   })
   register_intrument: InstrumentEntity[];
-  @ManyToMany(() => BookEntity, { eager: true })
+  @ManyToMany(() => BookEntity, { eager: true , nullable:true})
   @JoinTable({
     name: 'book_register',
     joinColumn: { name: 'register_id', referencedColumnName: 'id' },

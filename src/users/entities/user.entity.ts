@@ -12,6 +12,7 @@ import {
 import { Roles } from '../utilities/common/user-role.enum';
 import { RegisterEntity } from 'src/registers/entities/register.entity';
 import { OrderEntity } from 'src/orders/entites/order.entity';
+import { BookEntity } from 'src/books/entities/book.entity';
 
 @Entity('users')
 export class UserEntity {
@@ -49,4 +50,7 @@ export class UserEntity {
   update_At: Timestamp;
   @OneToMany(() => OrderEntity, (order) => order.user)
   orders: OrderEntity[];
+
+  @OneToMany(() => BookEntity, (book) => book.addedBy)
+  books: BookEntity[];
 }

@@ -11,6 +11,7 @@ import { InstrumentEntity } from 'src/instruments/entities/instrument.entity';
 import { CategoryEntity } from 'src/categories/entities/category.entity';
 import { BookEntity } from 'src/books/entities/book.entity';
 import { UserEntity } from 'src/users/entities/user.entity';
+import { MemcachedService } from 'src/memcached/memcached.service';
 
 @Injectable()
 export class RegistersService {
@@ -23,15 +24,27 @@ export class RegistersService {
     private readonly instrumentRepository: Repository<InstrumentEntity>,
     @InjectRepository(BookEntity)
     private readonly bookRepository: Repository<BookEntity>,
-  ) {}
+    private readonly memcachedService: MemcachedService,
+  ) { }
 
   async findOne(user: UserEntity) {
+    const cacheKey = `register_findOne${user}`;
+
+    const start = performance.now();
+
+    const cachedResult = await this.memcachedService.getCache(cacheKey);
+    if (cachedResult) {
+      const end = performance.now();
+      // console.log(`Database query took ${end - start} milliseconds`);
+      return cachedResult;
+    }
     if (!user || !user.id) {
       throw new NotFoundException('User not found. Please log in.');
     }
     const register = await this.registerRepository.findOne({
       where: { id: user.register.id },
     });
+    this.memcachedService.setCache(cacheKey, register);
     return register;
   }
   async update(
@@ -52,11 +65,21 @@ export class RegistersService {
         updateRegisterDto.register_category,
       );
     }
-
+    this.memcachedService.flushCache();
     return this.saveRegister(register);
   }
 
   private async findRegisterById(id: number): Promise<RegisterEntity> {
+    const cacheKey = `register_findRegisterById_${id}`;
+
+    const start = performance.now();
+
+    const cachedResult = await this.memcachedService.getCache(cacheKey);
+    if (cachedResult) {
+      const end = performance.now();
+      // console.log(`Database query took ${end - start} milliseconds`);
+      return cachedResult;
+    }
     const register = await this.registerRepository.findOne({
       where: { id },
       relations: ['register_category', 'register_intrument'],
@@ -64,6 +87,7 @@ export class RegistersService {
     if (!register) {
       throw new NotFoundException(`Register with ID ${id} not found.`);
     }
+    this.memcachedService.setCache(cacheKey, register);
     return register;
   }
 
@@ -100,6 +124,7 @@ export class RegistersService {
     register: RegisterEntity,
   ): Promise<RegisterEntity> {
     try {
+      this.memcachedService.flushCache();
       return await this.registerRepository.save(register);
     } catch (error) {
       throw new InternalServerErrorException(

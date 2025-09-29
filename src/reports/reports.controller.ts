@@ -1,17 +1,21 @@
-import { Controller, Get, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common';
 import { ReportsService } from './reports.service';
-import { Response } from 'express';
+import { response, Response } from 'express';
 import { AuthenticationGuard } from 'src/users/utilities/guards/authentication.guards';
 import { AuthorizeGuard } from 'src/users/utilities/guards/authorization.guards';
 import { Roles } from 'src/users/utilities/common/user-role.enum';
 
 @Controller('reports')
 export class ReportsController {
-  constructor(private readonly reportsService: ReportsService) {}
-  @UseGuards(AuthenticationGuard, AuthorizeGuard([Roles.ADMIN, Roles.ROOT]))
+  constructor(private readonly reportsService: ReportsService) { }
+  // @UseGuards(AuthenticationGuard, AuthorizeGuard([Roles.ADMIN, Roles.ROOT]))
   @Get('books')
-  async getBookReport(@Res() response: Response) {
-    const pdfDoc = await this.reportsService.getBooksReport();
+  async getBookReport(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Res() response?: Response,
+  ) {
+    const pdfDoc = await this.reportsService.getBooksReport(startDate, endDate);
     response.setHeader('Content-Type', 'application/pdf');
     pdfDoc.info.Title = 'Reporte';
     pdfDoc.pipe(response);
@@ -36,4 +40,14 @@ export class ReportsController {
     pdfDoc.pipe(response);
     pdfDoc.end();
   }
-}
+
+  @UseGuards(AuthenticationGuard, AuthorizeGuard([Roles.ADMIN, Roles.ROOT]))
+  @Get('analytics')
+  async getAnalyticsReport(@Res() response: Response) {
+    const pdfDoc = await this.reportsService.getAnalyticsReport();
+    response.setHeader('Content-Type', 'application/pdf');
+    pdfDoc.info.Title = 'Reporte';
+    pdfDoc.pipe(response);
+    pdfDoc.end();
+  }
+} 

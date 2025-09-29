@@ -1,26 +1,28 @@
-import { Expose } from 'class-transformer';
 import { BookEntity } from 'src/books/entities/book.entity';
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  Index,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 
 @Entity('contents')
 export class ContentEntity {
   @PrimaryGeneratedColumn()
-  @Expose()
   id: number;
 
+  @Index('IDX_CONTENT_TITLE')
   @Column({ nullable: true })
-  @Expose()
   content_sectionTitle: string;
 
+  @Index('IDX_CONTENT_TITLE_PARALLEL')
   @Column({ nullable: true })
-  @Expose()
   content_sectionTitleParallel: string;
 
   @Column({ nullable: true })
-  @Expose()
   content_pageNumber: number;
 
   @ManyToOne(() => BookEntity, (book) => book.book_contents)
-  @Expose()
   book: BookEntity;
 }

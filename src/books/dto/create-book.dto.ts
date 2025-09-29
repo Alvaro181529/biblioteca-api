@@ -9,7 +9,7 @@ import {
   IsNumber,
   IsArray,
 } from 'class-validator';
-import { Condition, MediaType } from '../utilities/common/book-dondition.enum';
+import { Condition, MediaType } from '../utilities/common/book-condition.enum';
 import { Type } from 'class-transformer';
 export class CreateBookDto {
   @IsOptional()

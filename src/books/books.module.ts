@@ -12,6 +12,8 @@ import { AuthorEntity } from 'src/authors/entities/author.entity';
 import { AuthorsModule } from 'src/authors/authors.module';
 import { InstrumentEntity } from 'src/instruments/entities/instrument.entity';
 import { ContentEntity } from 'src/contents/entities/content.entity';
+import { UserEntity } from 'src/users/entities/user.entity';
+import { MemcachedService } from 'src/memcached/memcached.service';
 
 @Module({
   imports: [
@@ -21,6 +23,7 @@ import { ContentEntity } from 'src/contents/entities/content.entity';
       AuthorEntity,
       InstrumentEntity,
       ContentEntity,
+      UserEntity,
     ]),
     HttpModule,
     PaginacionModule,
@@ -28,7 +31,7 @@ import { ContentEntity } from 'src/contents/entities/content.entity';
     CategoriesModule,
   ],
   controllers: [BooksController],
-  providers: [BooksService, CurrencyService],
+  providers: [BooksService, CurrencyService, MemcachedService],
   exports: [BooksService],
 })
 export class BooksModule {}

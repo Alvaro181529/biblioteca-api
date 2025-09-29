@@ -18,6 +18,11 @@ import { ContentEntity } from 'src/contents/entities/content.entity';
 import { OrderStatus } from 'src/orders/utilities/common/order-status.enum';
 import * as fs from 'fs';
 import * as path from 'path';
+import { UserEntity } from 'src/users/entities/user.entity';
+import { ExportImport } from './utilities/common/book-export.service';
+import { prioritizeBooksACO } from './utilities/common/book-algoritm.service';
+import { performance } from 'perf_hooks';
+import { MemcachedService } from 'src/memcached/memcached.service';
 
 @Injectable()
 export class BooksService {
@@ -30,11 +35,14 @@ export class BooksService {
     private readonly instrumentRepository: Repository<InstrumentEntity>,
     @InjectRepository(ContentEntity)
     private readonly contentRepository: Repository<ContentEntity>,
+    @InjectRepository(UserEntity)
+    private readonly userRepository: Repository<UserEntity>,
     @InjectRepository(CategoryEntity)
     private readonly categoryRepository: Repository<CategoryEntity>,
     private readonly currencyService: CurrencyService,
     private readonly paginacionService: PaginacionService,
-  ) {}
+    private readonly memcachedService: MemcachedService,
+  ) { }
   async validateRefernce(BookDto: any) {
     const [categories, authors, instruments] = await Promise.all([
       this.categoryRepository.findBy({ id: In(BookDto.book_category) }),
@@ -44,7 +52,7 @@ export class BooksService {
       }),
     ]);
 
-    // Definir las validaciones en un mapa
+
     const validations: [any[], number, string][] = [
       [categories, BookDto.book_category.length, 'Some categories not found.'],
       [
@@ -83,8 +91,7 @@ export class BooksService {
     if (!fs.existsSync(filePath)) return;
     fs.unlink(filePath, (err) => {
       if (err) {
-        console.error(`Error al eliminar el archivo: ${filePath}`, err);
-        return;
+        throw new BadRequestException('Error al eliminar el archivo')
       }
     });
   }
@@ -131,9 +138,17 @@ export class BooksService {
     }
   }
 
-  extractNumberFromInventory(inventory: string): number | null {
-    const match = inventory.match(/\d+/);
-    return match ? parseInt(match[0], 10) : null;
+  extractNumberFromInventory(inventory: string, type: string): number | null {
+    if (!inventory || !type) return null;
+    const normalizedType = type.toUpperCase();
+    const normalizedInventory = inventory.toUpperCase();
+
+    if (normalizedInventory.startsWith(normalizedType)) {
+      const match = normalizedInventory.match(/\d+/);
+      return match ? parseInt(match[0], 10) : null;
+    }
+
+    return null; // Si no coincide, devolvemos null
   }
   async countInventory(
     book: BookEntity,
@@ -145,7 +160,10 @@ export class BooksService {
     });
     const bookType = createBookDto.book_type.toLocaleUpperCase();
     const numberAsInteger: number = lastBook
-      ? this.extractNumberFromInventory(lastBook.book_inventory) || 1
+      ? this.extractNumberFromInventory(
+        lastBook.book_inventory,
+        lastBook.book_type,
+      ) || 1
       : 0;
     const booksCount = Number(numberAsInteger);
     const formattedCount = (booksCount + 1).toString().padStart(8, '0');
@@ -162,6 +180,7 @@ export class BooksService {
     if (Array.isArray(field)) return field;
     return [];
   };
+
 
   async assingDto(book: BookEntity, createBookDto: any) {
     const { categories, authors, instruments } =
@@ -184,22 +203,24 @@ export class BooksService {
         ? book.book_original_price
         : book.book_price_type
           ? await this.currencyService.convertToBolivianos(
-              book.book_original_price,
-              book.book_price_type,
-            )
+            book.book_original_price,
+            book.book_price_type,
+          )
           : 0;
   }
   async create(
     createBookDto: CreateBookDto,
     files: Array<Express.Multer.File>,
+    currentUser: UserEntity,
   ): Promise<BookEntity> {
     const book = new BookEntity();
     Object.assign(book, createBookDto);
     await this.assingDto(book, createBookDto);
     await this.countInventory(book, createBookDto);
     this.filesUpload(book, createBookDto, files);
-    console.log(book);
+    book.addedBy = currentUser;
     try {
+      await this.memcachedService.flushCache();
       return await this.bookRepository.save(book);
     } catch (error) {
       throw new BadRequestException('Error en el guardado' + error);
@@ -214,7 +235,7 @@ export class BooksService {
       },
       take: 6,
     });
-    return books; // O lo que desees retornar
+    return books;
   }
   async searchBooks(
     searchTerm: string,
@@ -268,14 +289,33 @@ export class BooksService {
     searchAuthors: string[] = [],
     searchInstruments: string[] = [],
   ): Promise<any> {
+    const start = performance.now();
+
     const query = this.bookRepository.createQueryBuilder('book');
-    // Si hay un término de búsqueda, agregar la cláusula WHERE
+
+    let booksFilters: BookEntity[] | null = null;
+    let cachedResult: any;
+    const cacheKey = `books_${page}_${pageSize}_${searchTerm.toLowerCase().replace(/\s+/g, '_')}_${searchType}_${searchCategories.join(',')}_${searchAuthors.join(',')}_${searchInstruments.join(',')}`;
+    if (
+      !searchAuthors.length && !searchInstruments.length && !searchCategories.length
+    ) {
+      cachedResult = await this.memcachedService.getCache(cacheKey);
+    } else {
+      cachedResult = null;
+    }
+    if (cachedResult) {
+      const end = performance.now();
+      // console.log(`Database query took ${end - start} milliseconds`);
+      return cachedResult;
+    }
     if (searchTerm) {
       query.andWhere(
         `(
-          similarity(unaccent_immutable(book.book_title_original), unaccent_immutable(:searchTerm)) > 0.3
-          OR similarity(unaccent_immutable(book.book_title_parallel), unaccent_immutable(:searchTerm)) > 0.3
-          OR book.book_headers ILIKE :searchTerm
+          book.book_headers ILIKE :searchTerm
+          OR similarity(unaccent_immutable(book.book_title_parallel), unaccent_immutable(:searchTerm)) > 0.2
+          OR similarity(unaccent_immutable(book.book_title_original), unaccent_immutable(:searchTerm)) > 0.3
+          OR similarity(unaccent_immutable(book.book_inventory), unaccent_immutable(:searchTerm)) > 0.8
+          OR similarity(unaccent_immutable(book.book_location), unaccent_immutable(:searchTerm)) > 0.8
         )`,
         { searchTerm: `%${searchTerm.toLowerCase()}%` },
       );
@@ -320,7 +360,7 @@ export class BooksService {
         );
     }
 
-    // Seleccionar los campos deseados
+
     query.select([
       'book.id',
       'book.book_imagen',
@@ -346,7 +386,126 @@ export class BooksService {
       pageSize,
       total,
     );
+    const end = performance.now();
+    // console.log(`Database query took ${end - start} milliseconds`);
+    if (searchTerm) {
+      const start = performance.now();
+      booksFilters = await prioritizeBooksACO(searchTerm, paginatedResult.data);
+      const end = performance.now();
+      // console.log(`Database query took ${end - start} milliseconds`);
+    }
+    if (
+      !searchAuthors.length && !searchInstruments.length && !searchCategories.length
+    )
+      this.memcachedService.setCache(cacheKey, paginatedResult);
+    return {
+      data: booksFilters ? booksFilters : paginatedResult.data,
+      total: paginatedResult.total,
+      currentPage: paginatedResult.currentPage,
+      totalPages: paginatedResult.totalPages,
+      range: paginatedResult.range,
+    };
+  }
 
+  async findMyBooks(
+    page: number = 1,
+    pageSize: number = 10,
+    searchTerm: string = '',
+    searchType: string = '',
+    searchCategories: string[] = [],
+    searchAuthors: string[] = [],
+    searchInstruments: string[] = [],
+    currentUser: UserEntity
+  ): Promise<any> {
+    const cacheKey = `books_${page}_${pageSize}_${searchTerm.toLowerCase().replace(/\s+/g, '_')}_${searchType}_${searchCategories.join(',')}_${searchAuthors.join(',')}_${searchInstruments.join(',')}`;
+    const start = performance.now();
+
+    const cachedResult = await this.memcachedService.getCache(cacheKey);
+    if (cachedResult) {
+      const end = performance.now();
+      // console.log(`Database query took ${end - start} milliseconds`);
+      return cachedResult;
+    }
+    const query = this.bookRepository.createQueryBuilder('book');
+    query.andWhere(`book.addedBy = :currentUser`, { currentUser: currentUser.id });
+
+    if (searchTerm) {
+      query.andWhere(
+        `(
+          book.book_headers ILIKE :searchTerm
+          OR similarity(unaccent_immutable(book.book_title_parallel), unaccent_immutable(:searchTerm)) > 0.2
+          OR similarity(unaccent_immutable(book.book_title_original), unaccent_immutable(:searchTerm)) > 0.3
+        )`,
+        { searchTerm: `%${searchTerm.toLowerCase()}%` },
+      );
+    }
+    if (searchType) {
+      query.andWhere(`book.book_type = :searchType`, {
+        searchType,
+      });
+    }
+    if (searchCategories?.length) {
+      query
+        .leftJoinAndSelect('book.book_category', 'category')
+        .andWhere(
+          `unaccent(lower(category.category_name)) IN (:...searchCategories)`,
+          {
+            searchCategories: searchCategories.map((cat) => cat.toLowerCase()),
+          },
+        );
+    }
+
+    if (searchAuthors?.length) {
+      query
+        .leftJoinAndSelect('book.book_authors', 'author')
+        .andWhere(
+          `unaccent(lower(author.author_name)) IN (:...searchAuthors)`,
+          {
+            searchAuthors: searchAuthors.map((auth) => auth.toLowerCase()),
+          },
+        );
+    }
+
+    if (searchInstruments?.length) {
+      query
+        .leftJoinAndSelect('book.book_instruments', 'instrument')
+        .andWhere(
+          `unaccent(lower(instrument.instrument_name)) IN (:...searchInstruments)`,
+          {
+            searchInstruments: searchInstruments.map((instr) =>
+              instr.toLowerCase(),
+            ),
+          },
+        );
+    }
+
+
+    query.select([
+      'book.id',
+      'book.book_imagen',
+      'book.book_headers',
+      'book.book_inventory',
+      'book.book_type',
+      'book.book_condition',
+      'book.book_location',
+      'book.book_title_original',
+      'book.book_title_parallel',
+      'book.book_language',
+      'book.book_quantity',
+      'book.book_observation',
+    ]);
+    query.orderBy({
+      'book.book_type': 'ASC',
+      'book.book_create_at': 'ASC',
+    });
+    const [data, total] = await query.getManyAndCount();
+    const paginatedResult = this.paginacionService.paginate(
+      data,
+      page,
+      pageSize,
+      total,
+    );
+    this.memcachedService.setCache(cacheKey, paginatedResult);
     return {
       data: paginatedResult.data,
       total: paginatedResult.total,
@@ -357,6 +516,12 @@ export class BooksService {
   }
 
   async findOne(id: number): Promise<BookEntity> {
+    const cacheKey = `book_${id}`;
+    const cachedBook = await this.memcachedService.getCache(cacheKey);
+    if (cachedBook) {
+      return cachedBook;
+    }
+
     const book = await this.bookRepository.findOne({
       where: { id },
       relations: {
@@ -366,15 +531,44 @@ export class BooksService {
         book_contents: true,
       },
     });
-    if (!book) throw new NotFoundException(`Book with ID ${id} not found`);
+    if (!book) {
+      throw new NotFoundException(`Book with ID ${id} not found`);
+    }
+
+    this.memcachedService.setCache(cacheKey, book);
 
     return book;
+  }
+  async findOneSound(id: number): Promise<BookEntity | { message: string }> {
+    if (process.env.EXPORTS_CONVERT === 'true') {
+      try {
+
+        const book = await this.bookRepository.findOne({ where: { id: Number(id) } });
+        if (!book) throw new NotFoundException(`Book with ID ${id} not found`);
+        const NombreDocumento = book.book_document;
+        const CodigoInventario = book.book_inventory;
+        let data: any
+        if (CodigoInventario && NombreDocumento) {
+          data = await ExportImport(CodigoInventario, NombreDocumento);
+        }
+        data = {
+          midi_url: process.env.EXPORTS_CONVERT_URL + data.midi_url,
+          mxl_url: process.env.EXPORTS_CONVERT_URL + data.mxl_url
+        }
+        return data;
+      } catch (error) {
+        throw new NotFoundException(`fail convercion` + error);
+      }
+    } else {
+      throw new NotFoundException(`fail convercion`);
+    }
   }
 
   async update(
     id: number,
     updateBookDto: UpdateBookDto,
     files: Array<Express.Multer.File>,
+    currentUser: UserEntity,
   ): Promise<BookEntity> {
     const book = await this.bookRepository.findOne({ where: { id } });
     if (!book) throw new NotFoundException(`Book with ID ${id} not found`);
@@ -385,12 +579,14 @@ export class BooksService {
     await this.assingDto(book, updateBookDto);
     this.filesUpload(book, updateBookDto, files, inventary);
     book.book_inventory = inventary;
+    book.addedBy = currentUser;
     if (updateBookDto.book_category?.length) book.book_category = categories;
     if (updateBookDto.book_instruments?.length)
       book.book_instruments = instruments;
     if (updateBookDto.book_authors?.length) book.book_authors = authors;
 
     try {
+      await this.memcachedService.flushCache();
       return await this.bookRepository.save(book);
     } catch (error) {
       throw new InternalServerErrorException(
@@ -456,6 +652,7 @@ export class BooksService {
     try {
       this.deleteFileIfExists(book.book_document, 'document');
       this.deleteFileIfExists(book.book_imagen, 'image');
+      await this.memcachedService.flushCache();
       const data = await this.bookRepository.remove(book);
       return { book: data, message: 'Book deleted successfully' };
     } catch (error) {

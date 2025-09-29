@@ -7,6 +7,7 @@ import { RegisterEntity } from 'src/registers/entities/register.entity';
 import { PaginacionModule } from 'src/pagination/pagination.module';
 import { BookEntity } from 'src/books/entities/book.entity';
 import { OrderEntity } from 'src/orders/entites/order.entity';
+import { MemcachedService } from 'src/memcached/memcached.service';
 
 @Module({
   imports: [
@@ -19,7 +20,7 @@ import { OrderEntity } from 'src/orders/entites/order.entity';
     PaginacionModule,
   ],
   controllers: [UsersController],
-  providers: [UsersService],
+  providers: [UsersService, MemcachedService],
   exports: [UsersService],
 })
 export class UsersModule {}
